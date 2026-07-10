@@ -123,6 +123,8 @@ function JeopardyPhone({ room, players, payload, playerId, myPlayer, addPlayer }
           value={name}
           onChange={e => setName(e.target.value)}
           maxLength={20}
+          autoCapitalize="words"
+          spellCheck={false}
           autoFocus
         />
         {name.trim() && (
@@ -351,6 +353,8 @@ function FamilyFeudPhone({ room, players, payload, playerId, myPlayer, addPlayer
           value={name}
           onChange={e => setName(e.target.value)}
           maxLength={20}
+          autoCapitalize="words"
+          spellCheck={false}
           autoFocus
         />
         {name.trim() && (
@@ -578,6 +582,8 @@ function ShowdownPhone({ room, players, payload, playerId, myPlayer, addPlayer, 
         value={name}
         onChange={e => setName(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && join()}
+        autoCapitalize="words"
+        spellCheck={false}
         autoFocus maxLength={20}
       />
       <button className="play-join-btn" onClick={join} disabled={!name.trim()}>

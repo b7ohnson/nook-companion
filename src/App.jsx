@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useNotifications } from './hooks/useNotifications'
@@ -8,10 +8,11 @@ import TasksTab from './components/TasksTab'
 import GroceriesTab from './components/GroceriesTab'
 import CalendarTab from './components/CalendarTab'
 import ToastNotifications from './components/ToastNotifications'
-import PlayRoom from './components/PlayRoom'
-import HeadsUpPhone from './components/HeadsUpPhone'
-import GalleryPanel from './components/GalleryPanel'
 import { IconHome, IconCheckSquare, IconShoppingCart, IconCalendar, IconSun, IconMoon, IconCamera } from './components/Icons'
+
+const GalleryPanel  = lazy(() => import('./components/GalleryPanel'))
+const PlayRoom      = lazy(() => import('./components/PlayRoom'))
+const HeadsUpPhone  = lazy(() => import('./components/HeadsUpPhone'))
 
 const TABS = [
   { id: 'home',      label: 'Home',      Icon: IconHome         },
@@ -31,11 +32,19 @@ export default function App() {
   const path = window.location.pathname
   if (path.startsWith('/play/headsup/')) {
     const roomCode = path.replace('/play/headsup/', '').replace(/\//g, '')
-    return <HeadsUpPhone roomCode={roomCode} />
+    return (
+      <Suspense fallback={<div className="splash"><div className="splash-spinner" /></div>}>
+        <HeadsUpPhone roomCode={roomCode} />
+      </Suspense>
+    )
   }
   if (path.startsWith('/play/')) {
     const roomCode = path.replace('/play/', '').replace(/\//g, '')
-    return <PlayRoom roomCode={roomCode} />
+    return (
+      <Suspense fallback={<div className="splash"><div className="splash-spinner" /></div>}>
+        <PlayRoom roomCode={roomCode} />
+      </Suspense>
+    )
   }
 
   if (loading) return (
@@ -50,6 +59,7 @@ export default function App() {
     <div className="app">
       <ToastNotifications toasts={toasts} dismiss={dismiss} />
       <header className="app-bar">
+        <h1 className="sr-only">NooK</h1>
         <div className="app-bar-left">
           <svg className="app-bar-mark" width="22" height="25" viewBox="0 0 64 74" aria-hidden="true">
             <path d="M7,70 L7,31 C7,14 19,5 32,5 C45,5 57,14 57,31 L57,70"
@@ -63,12 +73,19 @@ export default function App() {
           <span className="app-bar-title">NooK</span>
         </div>
         <div className="app-bar-right">
-          <button className="dark-toggle" onClick={toggleDark} title={dark ? 'Light mode' : 'Dark mode'}>
+          <button
+            className="dark-toggle"
+            onClick={toggleDark}
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={dark ? 'Light mode' : 'Dark mode'}
+          >
             {dark ? <IconSun size={16} /> : <IconMoon size={16} />}
           </button>
           {user.photoURL
-            ? <img src={user.photoURL} alt="" className="app-bar-avatar" onClick={logOut} />
-            : <button className="app-bar-avatar app-bar-avatar--initial" onClick={logOut}>
+            ? <button className="app-bar-avatar app-bar-avatar--photo" onClick={logOut} aria-label="Sign out">
+                <img src={user.photoURL} alt="" className="app-bar-avatar-img" />
+              </button>
+            : <button className="app-bar-avatar app-bar-avatar--initial" onClick={logOut} aria-label="Sign out">
                 {user.displayName?.[0] || '?'}
               </button>
           }
@@ -80,7 +97,11 @@ export default function App() {
         <div hidden={tab !== 'tasks'}>     <TasksTab /></div>
         <div hidden={tab !== 'groceries'}> <GroceriesTab /></div>
         <div hidden={tab !== 'calendar'}>  <CalendarTab /></div>
-        <div hidden={tab !== 'gallery'}>   <GalleryPanel onClose={() => setTab('home')} /></div>
+        <div hidden={tab !== 'gallery'}>
+          <Suspense fallback={<div className="splash"><div className="splash-spinner" /></div>}>
+            <GalleryPanel onClose={() => setTab('home')} />
+          </Suspense>
+        </div>
       </main>
 
       <nav className="bottom-nav">

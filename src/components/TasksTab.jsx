@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import { IconAlertTriangle, IconCheck } from './Icons'
 
@@ -30,6 +30,8 @@ function nextReset(task) {
 function AddModal({ person, onAdd, onClose }) {
   const [text, setText]             = useState('')
   const [recurrence, setRecurrence] = useState(null)
+  const modalRef    = useRef(null)
+  const prevFocusRef = useRef(null)
 
   const canSubmit = text.trim() && recurrence !== null
 
@@ -39,11 +41,53 @@ function AddModal({ person, onAdd, onClose }) {
     onClose()
   }
 
+  // Save previously focused element and restore on unmount
+  useEffect(() => {
+    prevFocusRef.current = document.activeElement
+    return () => { if (prevFocusRef.current) prevFocusRef.current.focus() }
+  }, [])
+
+  // Escape to close
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Focus trap: cycle Tab/Shift+Tab within modal
+  useEffect(() => {
+    const modal = modalRef.current
+    if (!modal) return
+    const onKey = (e) => {
+      if (e.key !== 'Tab') return
+      const focusable = Array.from(modal.querySelectorAll(
+        'button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+      ))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last  = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <div className="task-modal-backdrop" onClick={onClose}>
-      <div className="task-modal" onClick={e => e.stopPropagation()}>
+      <div
+        className="task-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-task-modal-title"
+        ref={modalRef}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="task-modal-header">
-          <span className="task-modal-title">New Task</span>
+          <span id="add-task-modal-title" className="task-modal-title">New Task</span>
           <button className="task-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -53,6 +97,8 @@ function AddModal({ person, onAdd, onClose }) {
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && canSubmit && submit()}
+          autoCapitalize="sentences"
+          autoCorrect="off"
           autoFocus
         />
 
@@ -142,15 +188,16 @@ export default function TasksTab() {
       </div>
 
       {/* Active tasks */}
-      <div className="item-list">
+      <ul className="item-list">
         {activeList.length === 0 && (
           <p className="empty-msg">No tasks — tap + to add one</p>
         )}
         {activeList.map(item => (
-          <div key={item.id} className="item-row">
+          <li key={item.id} className="item-row">
             <button
               className="item-check"
               style={{ borderColor: person.color }}
+              aria-label={item.done ? `Uncheck ${item.task}` : `Complete ${item.task}`}
               onClick={() => handleToggle(active, item)}
             />
             <div className="item-body">
@@ -168,10 +215,10 @@ export default function TasksTab() {
                 </span>
               )}
             </div>
-            <button className="item-del" onClick={() => remove(active, item.id)}>✕</button>
-          </div>
+            <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>✕</button>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {/* Undo toast */}
       {undoItem && (
@@ -209,7 +256,7 @@ export default function TasksTab() {
                       </span>
                     )}
                   </div>
-                  <button className="item-del" onClick={() => remove(active, item.id)}>✕</button>
+                  <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>✕</button>
                 </div>
               ))}
             </div>

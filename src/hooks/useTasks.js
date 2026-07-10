@@ -4,21 +4,35 @@ import { db } from '../firebase'
 
 const REF = doc(db, 'skylight', 'tasks')
 
-const RECURRENCE_MS = {
-  daily:   1 * 24 * 60 * 60 * 1000,
-  weekly:  7 * 24 * 60 * 60 * 1000,
-  monthly: 30 * 24 * 60 * 60 * 1000,
+function nextMidnight(ts) {
+  const d = new Date(ts)
+  d.setHours(24, 0, 0, 0)
+  return d.getTime()
+}
+
+function nextWeekStart(ts) {
+  const d = new Date(ts)
+  d.setDate(d.getDate() + (7 - d.getDay()))
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+function nextMonthStart(ts) {
+  const d = new Date(ts)
+  d.setMonth(d.getMonth() + 1, 1)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
 }
 
 function resetElapsed(list) {
   const now = Date.now()
   return list.map(t => {
-    if (!t.done || !t.recurrence || t.recurrence === 'none') return t
-    const ms = RECURRENCE_MS[t.recurrence]
-    if (ms && t.completedAt && now - t.completedAt >= ms) {
-      return { ...t, done: false, completedAt: null }
-    }
-    return t
+    if (!t.done || !t.recurrence || t.recurrence === 'none' || !t.completedAt) return t
+    let shouldReset = false
+    if (t.recurrence === 'daily')   shouldReset = now >= nextMidnight(t.completedAt)
+    if (t.recurrence === 'weekly')  shouldReset = now >= nextWeekStart(t.completedAt)
+    if (t.recurrence === 'monthly') shouldReset = now >= nextMonthStart(t.completedAt)
+    return shouldReset ? { ...t, done: false, completedAt: null } : t
   })
 }
 

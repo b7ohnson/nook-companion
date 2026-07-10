@@ -67,6 +67,8 @@ export default function CalendarTab() {
   const [form, setForm]       = useState(null)
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmDeleteTimerRef = useRef(null)
   const scrollRef             = useRef(null)
   const today                 = todayStr()
   const nowMins               = new Date().getHours() * 60 + new Date().getMinutes()
@@ -89,6 +91,9 @@ export default function CalendarTab() {
 
   const handleSave = async () => {
     if (!form.title.trim()) { setErr('Title required'); return }
+    if (!form.allDay && form.endTime && form.startTime && form.endTime <= form.startTime) {
+      setErr('End time must be after start time'); return
+    }
     setSaving(true); setErr(null)
     try {
       if (form._id) await cal.updateEvent(form.calendarId, form._id, form)
@@ -98,7 +103,14 @@ export default function CalendarTab() {
   }
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this event?')) return
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      clearTimeout(confirmDeleteTimerRef.current)
+      confirmDeleteTimerRef.current = setTimeout(() => setConfirmDelete(false), 3000)
+      return
+    }
+    setConfirmDelete(false)
+    clearTimeout(confirmDeleteTimerRef.current)
     setSaving(true)
     try { await cal.deleteEvent(form.calendarId, form._id); closeForm() }
     catch (e) { setErr(e.message) } finally { setSaving(false) }
@@ -166,6 +178,13 @@ export default function CalendarTab() {
           </div>
 
           {/* Day columns */}
+          {!cal.isSignedIn && (
+            <div className="cal-empty-state">
+              <p>Connect your Google Calendar to see events</p>
+              <button onClick={cal.signIn} className="cal-connect-btn">Connect</button>
+            </div>
+          )}
+
           <div className="cal-cols">
             {HOURS.map(h => (
               <div key={h} className="cal-line" style={{ top: (h - HOUR_START) * PX_PER_HOUR }} />
@@ -221,7 +240,8 @@ export default function CalendarTab() {
 
             <div className="sheet-body">
               <input className="sheet-input sheet-input--title" placeholder="Event title"
-                value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))} autoFocus />
+                value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
+                autoFocus autoCapitalize="sentences" />
 
               <label className="sheet-check-row">
                 <input type="checkbox" checked={form.allDay} onChange={e => setForm(f => ({...f, allDay: e.target.checked}))} />
@@ -265,7 +285,16 @@ export default function CalendarTab() {
             </div>
 
             <div className="sheet-footer">
-              {form._id && <button className="sheet-btn sheet-btn--delete" onClick={handleDelete} disabled={saving}>Delete</button>}
+              {form._id && (
+                <button
+                  className="sheet-btn sheet-btn--delete"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  style={confirmDelete ? { color: '#c53030' } : undefined}
+                >
+                  {confirmDelete ? 'Confirm delete?' : 'Delete event'}
+                </button>
+              )}
               <div style={{flex:1}} />
               <button className="sheet-btn sheet-btn--cancel" onClick={closeForm}>Cancel</button>
               <button className="sheet-btn sheet-btn--save"   onClick={handleSave}   disabled={saving}>

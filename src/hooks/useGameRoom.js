@@ -5,7 +5,7 @@ import { db } from '../firebase'
 const TWO_HOURS = 2 * 60 * 60 * 1000
 
 export function generateRoomCode() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase()
+  return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
 export function useGameRoom(roomCode) {
@@ -63,11 +63,15 @@ export function useGameRoom(roomCode) {
     await deleteDoc(doc(db, 'gameRooms', roomCode))
   }
 
+  const createdMs = room?.createdAt?.toMillis?.() || 0
+  const expiringWarning = createdMs > 0 && Date.now() - createdMs > TWO_HOURS - 15 * 60 * 1000
+
   return {
     room,
     players: room?.players || [],
     payload: room?.payload || {},
     loading,
+    expiringWarning,
     createRoom,
     updateState,
     updatePayload,

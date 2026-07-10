@@ -3,6 +3,8 @@ import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from
 import { auth } from '../firebase'
 
 const provider = new GoogleAuthProvider()
+provider.addScope('email')
+provider.addScope('profile')
 
 export function useAuth() {
   const [user, setUser] = useState(undefined)

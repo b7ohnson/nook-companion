@@ -16,7 +16,7 @@ export function useGallery() {
       const list = snap.data()?.photos || []
       photosRef.current = list
       setPhotos(list)
-    })
+    }, err => { console.error(err); setPhotos([]) })
   }, [])
 
   const upload = (files) => {
@@ -34,8 +34,7 @@ export function useGallery() {
         err  => { console.error('Upload error:', err); done(null) },
         async () => {
           const url = await getDownloadURL(task.snapshot.ref)
-          const label = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
-          done({ id, url, name: label, uploadedAt: Date.now() })
+          done({ id, url, label: '', uploadedAt: Date.now() })
         }
       )
     }

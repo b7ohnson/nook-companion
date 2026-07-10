@@ -5,17 +5,27 @@ import { db } from '../firebase'
 const REF = doc(db, 'skylight', 'groceries')
 
 export function useGroceries() {
-  const [items, setItems]   = useState([])
-  const [synced, setSynced] = useState(false)
-  const [error, setError]   = useState(null)
-  const itemsRef            = useRef([])
+  const [items, setItems]           = useState([])
+  const [synced, setSynced]         = useState(false)
+  const [error, setError]           = useState(null)
+  const [remoteUpdate, setRemoteUpdate] = useState(0)
+  const itemsRef                    = useRef([])
+  const prevCountRef                = useRef(null)
 
   useEffect(() => {
     return onSnapshot(REF,
       snap => {
-        const latest = snap.data()?.items || []
-        itemsRef.current = latest
-        setItems(latest)
+        const incoming = snap.data()?.items || []
+        if (
+          prevCountRef.current !== null &&
+          !snap.metadata.hasPendingWrites &&
+          incoming.length > prevCountRef.current
+        ) {
+          setRemoteUpdate(v => v + 1)
+        }
+        prevCountRef.current = incoming.length
+        itemsRef.current = incoming
+        setItems(incoming)
         setSynced(true)
         setError(null)
       },
@@ -51,5 +61,5 @@ export function useGroceries() {
       txn.update(REF, { items: current.filter(i => !i.done) })
     })
 
-  return { items, synced, error, add, toggle, remove, clearDone }
+  return { items, synced, error, add, toggle, remove, clearDone, remoteUpdate }
 }

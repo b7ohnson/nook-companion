@@ -19,7 +19,7 @@ function toGoogleBody({ title, date, startTime, endTime, allDay }) {
   }
 }
 
-export function useGoogleCalendar(clientId) {
+export function useGoogleCalendar(clientId, storageKey = 'companion') {
   const tokenKey = 'gcal_token'
   const userKey  = 'gcal_user'
   const connKey  = 'gcal_connected'
@@ -32,6 +32,7 @@ export function useGoogleCalendar(clientId) {
   const [error, setError]          = useState(null)
   const clientRef                  = useRef(null)
   const silentRef                  = useRef(null)
+  const fetchDebounceRef           = useRef(null)
 
   const onToken = useCallback((accessToken) => {
     sessionStorage.setItem(tokenKey, accessToken)
@@ -134,34 +135,49 @@ export function useGoogleCalendar(clientId) {
             const time = e.start.dateTime ? `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}` : null
             const endDt   = e.end?.dateTime ? new Date(e.end.dateTime) : null
             const endTime = endDt ? `${String(endDt.getHours()).padStart(2,'0')}:${String(endDt.getMinutes()).padStart(2,'0')}` : null
-            return { id: `${cal.id}::${e.id}`, googleEventId: e.id, calendarId: cal.id, title: e.summary || '(No title)', date, time, endTime, allDay: !!e.start.date, color: cal.backgroundColor || '#4A90D9' }
+            return { id: `${storageKey}::${cal.id}::${e.id}`, googleEventId: e.id, calendarId: cal.id, title: e.summary || '(No title)', date, time, endTime, allDay: !!e.start.date, color: cal.backgroundColor || '#4A90D9' }
           })).catch(() => [])
       ))
       setEvents(batches.flat())
     } catch (e) {
       if (e.message !== 'session_expired' && e.message !== 'insufficient_scopes') setError(e.message)
     } finally { setLoading(false) }
-  }, [trySilentRefresh, forceReauth])
+  }, [storageKey, trySilentRefresh, forceReauth])
 
   useEffect(() => { if (token) fetchAll(token) }, [token, fetchAll])
 
   const authFetch = useCallback((url, opts = {}) =>
     fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
-      .then(r => r.status === 204 ? null : r.json()), [token])
+      .then(async r => {
+        if (r.status === 401) { trySilentRefresh(); throw new Error('session_expired') }
+        if (r.status === 403) {
+          const body = await r.json().catch(() => ({}))
+          if (body?.error?.status === 'PERMISSION_DENIED' || body?.error?.errors?.[0]?.reason === 'insufficientPermissions') {
+            forceReauth(); throw new Error('insufficient_scopes')
+          }
+        }
+        if (r.status === 204) return null
+        return r.json()
+      }), [token, trySilentRefresh, forceReauth])
+
+  const debouncedFetch = useCallback((tk) => {
+    clearTimeout(fetchDebounceRef.current)
+    fetchDebounceRef.current = setTimeout(() => fetchAll(tk), 400)
+  }, [fetchAll])
 
   const createEvent = async (calendarId = 'primary', data) => {
     await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events`, { method: 'POST', body: JSON.stringify(toGoogleBody(data)) })
-    fetchAll(token)
+    debouncedFetch(token)
   }
 
   const updateEvent = async (calendarId, eventId, data) => {
     await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { method: 'PUT', body: JSON.stringify(toGoogleBody(data)) })
-    fetchAll(token)
+    debouncedFetch(token)
   }
 
   const deleteEvent = async (calendarId, eventId) => {
     await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
-    fetchAll(token)
+    debouncedFetch(token)
   }
 
   return { isSignedIn: !!token, signIn, signOut, user, events, calendarList, loading, error, createEvent, updateEvent, deleteEvent, refetch: () => token && fetchAll(token) }
