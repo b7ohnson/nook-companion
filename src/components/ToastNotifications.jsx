@@ -9,7 +9,7 @@ const TYPE_META = {
 export default function ToastNotifications({ toasts, dismiss }) {
   if (!toasts.length) return null
   return (
-    <div className="toast-stack">
+    <div className="toast-stack" aria-live="polite" aria-atomic="true">
       {toasts.map(t => {
         const { Icon, color } = TYPE_META[t.type] || TYPE_META.info
         return (

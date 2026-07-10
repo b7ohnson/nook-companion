@@ -54,7 +54,7 @@ export function useNotifications() {
       all.filter(t => !knownTasks.current.has(t.id)).forEach(t => {
         const msg = `New task for ${t.who}: "${t.task}"`
         addToast(msg, 'task')
-        pushNotification('NooK — New Task', msg)
+        pushNotification('NooK — New Task', 'You have a new task')
         knownTasks.current.add(t.id)
       })
     })
@@ -71,7 +71,7 @@ export function useNotifications() {
       items.filter(i => !knownGroc.current.has(i.id)).forEach(i => {
         const msg = `Grocery added: "${i.name}"`
         addToast(msg, 'grocery')
-        pushNotification('NooK — Groceries', msg)
+        pushNotification('NooK — Groceries', 'Shopping list updated')
         knownGroc.current.add(i.id)
       })
     })

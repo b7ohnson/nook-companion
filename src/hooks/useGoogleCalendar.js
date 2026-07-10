@@ -25,7 +25,7 @@ export function useGoogleCalendar(clientId) {
   const connKey  = 'gcal_connected'
 
   const [token, setToken]          = useState(() => sessionStorage.getItem(tokenKey))
-  const [user, setUser]            = useState(() => { try { return JSON.parse(localStorage.getItem(userKey) || 'null') } catch { return null } })
+  const [user, setUser]            = useState(() => { try { return JSON.parse(sessionStorage.getItem(userKey) || 'null') } catch { return null } })
   const [events, setEvents]        = useState([])
   const [calendarList, setCalList] = useState([])
   const [loading, setLoading]      = useState(false)
@@ -93,8 +93,8 @@ export function useGoogleCalendar(clientId) {
   const signOut = useCallback(() => {
     if (token) window.google?.accounts.oauth2.revoke(token, () => {})
     sessionStorage.removeItem(tokenKey)
+    sessionStorage.removeItem(userKey)
     localStorage.removeItem(connKey)
-    localStorage.removeItem(userKey)
     setToken(null); setUser(null); setEvents([]); setCalList([])
   }, [token])
 
@@ -113,8 +113,8 @@ export function useGoogleCalendar(clientId) {
     try {
       const uInfo = await get('https://www.googleapis.com/oauth2/v3/userinfo')
       if (uInfo.email) {
-        const u = { name: uInfo.given_name || uInfo.name, email: uInfo.email, picture: uInfo.picture }
-        localStorage.setItem(userKey, JSON.stringify(u))
+        const u = { name: uInfo.given_name || uInfo.name, picture: uInfo.picture }
+        sessionStorage.setItem(userKey, JSON.stringify(u))
         setUser(u)
       }
 

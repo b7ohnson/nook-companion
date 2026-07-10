@@ -1,9 +1,11 @@
 import { useTasks } from '../hooks/useTasks'
 import { useGroceries } from '../hooks/useGroceries'
 
-export default function HomeTab({ user }) {
-  const { tasks }    = useTasks()
-  const { items }    = useGroceries()
+export default function HomeTab({ user, onNavigate }) {
+  const { tasks, synced: tasksSynced } = useTasks()
+  const { items, synced: grocSynced }  = useGroceries()
+
+  const loading = !tasksSynced || !grocSynced
 
   const blessingPending = (tasks.blessing || []).filter(t => !t.done).length
   const pearlPending    = (tasks.pearl    || []).filter(t => !t.done).length
@@ -21,28 +23,28 @@ export default function HomeTab({ user }) {
       </div>
 
       <div className="home-cards">
-        <div className="home-card">
+        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('tasks')}>
           <div className="home-card-icon" style={{ background: '#EEF2FF' }}>📋</div>
           <div className="home-card-body">
             <div className="home-card-label">Blessing's Tasks</div>
-            <div className="home-card-value">{blessingPending} pending</div>
+            <div className="home-card-value">{loading ? '—' : `${blessingPending} pending`}</div>
           </div>
         </div>
 
-        <div className="home-card">
+        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('tasks')}>
           <div className="home-card-icon" style={{ background: '#FAF5FF' }}>📋</div>
           <div className="home-card-body">
             <div className="home-card-label">Pearl's Tasks</div>
-            <div className="home-card-value">{pearlPending} pending</div>
+            <div className="home-card-value">{loading ? '—' : `${pearlPending} pending`}</div>
           </div>
         </div>
 
-        <div className="home-card">
+        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('groceries')}>
           <div className="home-card-icon" style={{ background: '#F0FDF4' }}>🛒</div>
           <div className="home-card-body">
             <div className="home-card-label">Groceries</div>
             <div className="home-card-value">
-              {groceryPending} to get{groceryDone > 0 ? `, ${groceryDone} done` : ''}
+              {loading ? '—' : `${groceryPending} to get${groceryDone > 0 ? `, ${groceryDone} done` : ''}`}
             </div>
           </div>
         </div>

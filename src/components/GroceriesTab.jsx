@@ -3,7 +3,8 @@ import { useGroceries } from '../hooks/useGroceries'
 
 export default function GroceriesTab() {
   const { items, synced, error, add, toggle, remove, clearDone } = useGroceries()
-  const [input, setInput] = useState('')
+  const [input, setInput]           = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const submit = () => {
     if (!input.trim()) return
@@ -19,7 +20,21 @@ export default function GroceriesTab() {
         <h2 className="tab-title">Groceries</h2>
         <div className="tab-header-right">
           {doneCount > 0 && (
-            <button className="clear-btn" onClick={clearDone}>Clear {doneCount} ✓</button>
+            <button
+              className="clear-btn"
+              style={confirmClear ? { color: '#c53030' } : {}}
+              onClick={() => {
+                if (confirmClear) {
+                  clearDone()
+                  setConfirmClear(false)
+                } else {
+                  setConfirmClear(true)
+                  setTimeout(() => setConfirmClear(false), 3000)
+                }
+              }}
+            >
+              {confirmClear ? 'Confirm? Tap again' : `Clear ${doneCount} ✓`}
+            </button>
           )}
           <span className={synced ? 'sync-ok' : 'sync-err'}>
             {error ? '⚠ offline' : synced ? '● live' : '…'}
