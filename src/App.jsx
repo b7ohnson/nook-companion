@@ -7,8 +7,9 @@ import HomeTab from './components/HomeTab'
 import TasksTab from './components/TasksTab'
 import GroceriesTab from './components/GroceriesTab'
 import CalendarTab from './components/CalendarTab'
+import MenuManager from './components/MenuManager'
 import ToastNotifications from './components/ToastNotifications'
-import { IconHome, IconCheckSquare, IconShoppingCart, IconCalendar, IconSun, IconMoon, IconCamera } from './components/Icons'
+import { IconHome, IconCheckSquare, IconShoppingCart, IconCalendar, IconSun, IconMoon, IconCamera, IconUtensils } from './components/Icons'
 
 const GalleryPanel  = lazy(() => import('./components/GalleryPanel'))
 const PlayRoom      = lazy(() => import('./components/PlayRoom'))
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'home',      label: 'Home',      Icon: IconHome         },
   { id: 'tasks',     label: 'Tasks',     Icon: IconCheckSquare  },
   { id: 'groceries', label: 'Groceries', Icon: IconShoppingCart },
+  { id: 'menu',      label: 'Menu',      Icon: IconUtensils     },
   { id: 'calendar',  label: 'Calendar',  Icon: IconCalendar     },
   { id: 'gallery',   label: 'Gallery',   Icon: IconCamera       },
 ]
@@ -96,6 +98,7 @@ export default function App() {
         <div hidden={tab !== 'home'}>      <HomeTab user={user} onNavigate={setTab} /></div>
         <div hidden={tab !== 'tasks'}>     <TasksTab /></div>
         <div hidden={tab !== 'groceries'}> <GroceriesTab /></div>
+        <div hidden={tab !== 'menu'}>      <MenuManager /></div>
         <div hidden={tab !== 'calendar'}>  <CalendarTab /></div>
         <div hidden={tab !== 'gallery'}>
           <Suspense fallback={<div className="splash"><div className="splash-spinner" /></div>}>
