@@ -1,44 +1,10 @@
 import { useState, useEffect } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { resetElapsed } from 'nook-core/recurrence'
+import { TASKS } from 'nook-core/paths'
 import { db } from '../firebase'
 
-const REF = doc(db, 'skylight', 'tasks')
-
-function nextMidnight(ts) {
-  const d = new Date(ts)
-  d.setHours(24, 0, 0, 0)
-  return d.getTime()
-}
-
-// Weeks start Sunday, matching WeekView and MiniCalendar. Must stay
-// identical to the copy in nook-display — both apps reset the same
-// Firestore doc, so a mismatch makes weekly chores reset on whichever
-// day the app that happens to be open first uses.
-function nextWeekStart(ts) {
-  const d = new Date(ts)
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + (7 - d.getDay()))
-  return d.getTime()
-}
-
-function nextMonthStart(ts) {
-  const d = new Date(ts)
-  d.setMonth(d.getMonth() + 1, 1)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-
-function resetElapsed(list) {
-  const now = Date.now()
-  return list.map(t => {
-    if (!t.done || !t.recurrence || t.recurrence === 'none' || !t.completedAt) return t
-    let shouldReset = false
-    if (t.recurrence === 'daily')   shouldReset = now >= nextMidnight(t.completedAt)
-    if (t.recurrence === 'weekly')  shouldReset = now >= nextWeekStart(t.completedAt)
-    if (t.recurrence === 'monthly') shouldReset = now >= nextMonthStart(t.completedAt)
-    return shouldReset ? { ...t, done: false, completedAt: null } : t
-  })
-}
+const REF = doc(db, ...TASKS)
 
 export function useTasks() {
   const [tasks, setTasks]   = useState({ blessing: [], pearl: [] })

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { doc, updateDoc } from 'firebase/firestore'
+import { gameRoom } from 'nook-core/paths'
 import { db } from '../firebase'
 import { useGameRoom } from '../hooks/useGameRoom'
 import {
@@ -67,7 +68,7 @@ function AnswerScreen({ prompt, clueText, onSubmit }) {
 
 // ── Jeopardy phone UI ─────────────────────────────────────────
 function JeopardyPhone({ room, players, payload, playerId, myPlayer, addPlayer }) {
-  const roomDocRef   = useRef(doc(db, 'gameRooms', room.id))
+  const roomDocRef   = useRef(doc(db, ...gameRoom(room.id)))
   const [name, setName]             = useState('')
   const [mySubmission, setMySubmission] = useState(null)
 
@@ -248,7 +249,7 @@ function JeopardyPhone({ room, players, payload, playerId, myPlayer, addPlayer }
 
 // ── Family Feud phone UI ──────────────────────────────────────
 function FamilyFeudPhone({ room, players, payload, playerId, myPlayer, addPlayer }) {
-  const roomDocRef = useRef(doc(db, 'gameRooms', room.id))
+  const roomDocRef = useRef(doc(db, ...gameRoom(room.id)))
   const [name, setName]                 = useState('')
   const [mySubmission, setMySubmission] = useState(null)
   const [fmText, setFmText]             = useState('')

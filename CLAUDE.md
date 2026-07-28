@@ -1,19 +1,34 @@
 # NooK
 
 Family hub: a wall-mounted display + a phone companion app, sharing one
-Firebase project. **Two independent git repos**, no shared package or
-monorepo tooling:
+Firebase project. **Two independent git repos**, no monorepo tooling, plus
+one small shared package:
 
 - `~/skylight-calendar` (this repo) — GitHub `b7ohnson/nook-display`, the
   wall display, package name `skylight-calendar` (legacy, predates the
   "NooK" rebrand — leave it as-is).
 - `~/skylight-companion` — GitHub `b7ohnson/nook-companion`, the phone PWA.
+- `~/nook-core` — logic both apps must agree on. Pure functions and
+  constants; no React, no Firebase SDK. Currently a `file:../nook-core`
+  dependency in both apps, intended to become
+  `github:b7ohnson/nook-core#v1` once pushed.
 
-Several hooks (`useTasks`, `useGroceries`, `useGameRoom`, `useGallery`,
-`useGoogleCalendar`, `useNotifications`, `useAuth`, `useDarkMode`) are
-**duplicated verbatim between the two repos** — a schema or contract
-change in one needs the matching change in the other, made and reviewed
-separately since there's no shared code to catch it automatically.
+`nook-core` holds the chore-recurrence math (`nook-core/recurrence`),
+Firestore paths (`nook-core/paths`), and the room TTL and player cap
+(`nook-core/constants`). Use these instead of re-deriving date boundaries
+or writing `doc(db, 'skylight', 'tasks')` by hand — the recurrence math
+previously existed in both repos and drifted, leaving the display resetting
+weekly chores on Monday and the companion on Sunday against the same
+document.
+
+The **hooks themselves stay per-repo on purpose.** Several look duplicated
+but are a deliberate read-only/read-write split: the display's `useGallery`
+is 23 lines of slideshow against the companion's 81 lines of upload
+handling, and `useGameRoom` exposes the full set of game-driving mutators
+in the display versus only `addPlayer`/`updatePlayer` in the companion.
+Don't merge those. `useGoogleCalendar` is display-only. When a hook in one
+repo genuinely needs a behavior change that the other shares, the logic
+belongs in `nook-core`, not copy-pasted.
 
 ## This repo (nook-display)
 
@@ -75,9 +90,23 @@ commit these values.
   Seed from local mock data (`data/mockData.js`, `data/gameContentSeed.js`,
   `data/familyFeudSeed.js`, `data/jeopardySeed.js`) when empty.
 - **Real collections**: `gameRooms/{roomCode}` (multiplayer session state,
-  auto-expires ~2h), `scores` (leaderboard, ordered by score desc),
-  `gameContent` (riddles/trivia/would-you-rather/heads-up/Family
+  expires 2h after `createdAt`), `scores` (leaderboard, ordered by score
+  desc), `gameContent` (riddles/trivia/would-you-rather/heads-up/Family
   Feud/Jeopardy seed content).
+
+`firestore.rules` (this repo only — the companion deploys hosting only)
+deliberately has **no `/{document=**}` catch-all**. That recursive wildcard
+also matches `gameRooms/{roomCode}`, and since Firestore grants access when
+any matching rule allows, it silently gave every signed-in user unrestricted
+write access to game rooms. Each collection is listed explicitly instead, so
+**a new collection needs a new rule** or it is denied by default.
+
+Game rooms are readable by anyone (players join unauthenticated via QR) but
+writes are scoped: anonymous callers may only change `players`, and only
+before the room expires; creating, `state`/`payload` writes and deletes
+require auth. The 2h TTL and the 16-player cap are enforced in the rules and
+mirrored in `nook-core/constants` — rules can't import, so changing either
+means changing both.
 
 Each domain is wrapped in one `use*` hook per repo, following a consistent
 shape: local `useState`, a Firestore subscription in `useEffect`, and

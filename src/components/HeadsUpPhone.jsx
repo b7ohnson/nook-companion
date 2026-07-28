@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore'
+import { gameRoom } from 'nook-core/paths'
 import { db } from '../firebase'
 import { useGameRoom } from '../hooks/useGameRoom'
 import { IconSmartphone, IconCheckCircle, IconSkipForward, IconAlertTriangle, IconStar, IconFlame } from './Icons'
@@ -113,7 +114,7 @@ export default function HeadsUpPhone({ roomCode }) {
     if (phase !== 'done') return
     const save = async () => {
       try {
-        const ref = doc(db, 'gameRooms', roomCode)
+        const ref = doc(db, ...gameRoom(roomCode))
         const updated = (room?.players || []).map(p =>
           p.id === playerId
             ? { ...p, correct: correctRef.current, skipped: skippedRef.current, finished: true }

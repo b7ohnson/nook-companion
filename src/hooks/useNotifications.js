@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
+import { TASKS } from 'nook-core/paths'
 import { db } from '../firebase'
 
 async function pushNotification(title, body) {
@@ -40,7 +41,7 @@ export function useNotifications() {
   const dismiss = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'skylight', 'tasks'), snap => {
+    return onSnapshot(doc(db, ...TASKS), snap => {
       const data = snap.exists() ? snap.data() : {}
       const all  = [
         ...(data.blessing || []).map(t => ({ ...t, who: 'Blessing' })),
