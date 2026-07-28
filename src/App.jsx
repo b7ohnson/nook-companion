@@ -26,9 +26,8 @@ const TABS = [
 
 export default function App() {
   const { user, loading, signIn, logOut } = useAuth()
+  // Theme is applied to <html>, so it has to cover the login and /play screens.
   const { dark, toggle: toggleDark } = useDarkMode()
-  const { toasts, dismiss } = useNotifications()
-  const [tab, setTab] = useState('home')
 
   // Path-based game room routing (no auth required)
   const path = window.location.pathname
@@ -56,6 +55,17 @@ export default function App() {
   )
 
   if (!user) return <LoginPage onSignIn={signIn} />
+
+  return <SignedInApp user={user} logOut={logOut} dark={dark} toggleDark={toggleDark} />
+}
+
+// Firestore work lives below the auth gate. React runs hooks unconditionally,
+// so while useNotifications sat in App() it subscribed to skylight/tasks on the
+// login screen — and on the unauthenticated /play routes a QR guest lands on,
+// where the rules deny it outright.
+function SignedInApp({ user, logOut, dark, toggleDark }) {
+  const { toasts, dismiss } = useNotifications()
+  const [tab, setTab] = useState('home')
 
   return (
     <div className="app">

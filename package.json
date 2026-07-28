@@ -9,7 +9,7 @@
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
-    "firebase": "^10.12.0",
+    "firebase": "^12.16.0",
     "nook-core": "github:b7ohnson/nook-core#v1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
