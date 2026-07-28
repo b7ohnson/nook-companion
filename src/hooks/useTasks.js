@@ -10,10 +10,14 @@ function nextMidnight(ts) {
   return d.getTime()
 }
 
+// Weeks start Sunday, matching WeekView and MiniCalendar. Must stay
+// identical to the copy in nook-display — both apps reset the same
+// Firestore doc, so a mismatch makes weekly chores reset on whichever
+// day the app that happens to be open first uses.
 function nextWeekStart(ts) {
   const d = new Date(ts)
-  d.setDate(d.getDate() + (7 - d.getDay()))
   d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + (7 - d.getDay()))
   return d.getTime()
 }
 
