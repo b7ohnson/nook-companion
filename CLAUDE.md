@@ -8,10 +8,13 @@ one small shared package:
   wall display, package name `skylight-calendar` (legacy, predates the
   "NooK" rebrand — leave it as-is).
 - `~/skylight-companion` — GitHub `b7ohnson/nook-companion`, the phone PWA.
-- `~/nook-core` — logic both apps must agree on. Pure functions and
-  constants; no React, no Firebase SDK. Currently a `file:../nook-core`
-  dependency in both apps, intended to become
-  `github:b7ohnson/nook-core#v1` once pushed.
+- `~/nook-core` — GitHub `b7ohnson/nook-core` (private), logic both apps
+  must agree on. Pure functions and constants; no React, no Firebase SDK.
+  Consumed by both apps as `github:b7ohnson/nook-core#v1`, a pinned tag —
+  changing it means pushing a new tag and bumping the ref in both
+  `package.json` files, which is deliberate: a silent floating update
+  across two apps that share a database is the failure this package exists
+  to prevent.
 
 `nook-core` holds the chore-recurrence math (`nook-core/recurrence`),
 Firestore paths (`nook-core/paths`), and the room TTL and player cap
