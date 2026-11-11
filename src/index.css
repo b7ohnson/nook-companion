@@ -2657,3 +2657,28 @@ ul.item-list { list-style: none; padding: 0; margin: 0; }
   color: var(--accent);
   font-weight: 700;
 }
+
+/* ── Game-join screens (PlayRoom / HeadsUpPhone): inline notices, retry,
+      and sizing for the stroke icons that replaced emoji ── */
+.play-notice {
+  max-width: 340px;
+  width: 100%;
+  margin: 4px auto;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(239,68,68,0.45);
+  background: rgba(239,68,68,0.12);
+  color: #ef4444;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+.play-notice .play-retry-btn { display: block; margin: 10px auto 0; }
+.play-retry-btn { margin-top: 8px; min-width: 160px; }
+.play-splash--error .play-splash-msg--plain { color: var(--text-2); font-weight: 500; }
+.play-splash-icon svg, .hu-splash-icon svg, .buzz-btn-icon svg { display: block; margin: 0 auto; }
+.buzz-screen .play-notice { margin-bottom: 20px; }
+.play-steal-banner { display: inline-flex; align-items: center; gap: 8px; }
+.fm-phone-dup { display: inline-flex; align-items: center; gap: 6px; }
+.feud-team-btn:disabled, .play-answer-btn:disabled { opacity: 0.6; cursor: default; }
