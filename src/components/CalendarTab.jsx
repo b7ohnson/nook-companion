@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar'
 
 const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -45,6 +45,16 @@ function toH(start, end) {
   return Math.max(((e - s) / 60) * PX_PER_HOUR, 20)
 }
 
+function fromMins(mins) {
+  return `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`
+}
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000)
+}
+
+const canWrite = c => c.accessRole === 'owner' || c.accessRole === 'writer'
+
 function fmtHour(h) {
   if (h === 12) return '12p'
   return h > 12 ? `${h-12}p` : `${h}a`
@@ -76,17 +86,49 @@ export default function CalendarTab() {
 
   const days = useMemo(() => getThreeDays(offset), [offset])
 
-  const byDate = useMemo(() => {
-    const map = {}
-    days.forEach(d => { map[dateStr(d)] = [] })
+  // Fetch what is on screen plus a week either side, so the next few taps
+  // of ‹ › already have their events.
+  const { setRange } = cal
+  useEffect(() => {
+    const start = new Date(days[0]); start.setDate(start.getDate() - 7)
+    const end   = new Date(days[2]); end.setDate(end.getDate() + 8)
+    setRange(start, end)
+  }, [days, setRange])
+
+  const { byDate, allDayByDate, hasAllDay } = useMemo(() => {
+    const timed = {}, allDay = {}
+    let any = false
+    days.forEach(d => { timed[dateStr(d)] = []; allDay[dateStr(d)] = [] })
     cal.events.forEach(e => {
-      if (map[e.date] && !e.allDay && e.time) map[e.date].push(e)
+      if (e.allDay) {
+        // endDate is exclusive; a multi-day event shows on every day it covers.
+        for (const ds of Object.keys(allDay)) {
+          if (ds >= e.date && ds < (e.endDate || e.date + '~')) { allDay[ds].push(e); any = true }
+        }
+      } else if (timed[e.date] && e.time) {
+        timed[e.date].push(e)
+      }
     })
-    return map
+    return { byDate: timed, allDayByDate: allDay, hasAllDay: any }
   }, [cal.events, days])
 
-  const openNew   = (date, time) => setForm({ ...EMPTY_FORM(), date: date || today, startTime: time || '09:00', endTime: time ? `${pad(Math.min(parseInt(time)+1,22))}:${time.split(':')[1]}` : '10:00', calendarId: cal.calendarList.find(c => c.primary)?.id || 'primary' })
-  const openEdit  = e => setForm({ title: e.title, date: e.date, startTime: e.time || '09:00', endTime: e.endTime || '10:00', allDay: e.allDay, calendarId: e.calendarId, _id: e.googleEventId })
+  const writableCals = useMemo(() => cal.calendarList.filter(canWrite), [cal.calendarList])
+
+  const openNew = (date, time) => {
+    const start = time || '09:00'
+    // Clamp rather than add an hour blindly: a tap on the last row used to
+    // produce an end time equal to (or before) the start.
+    const end = fromMins(Math.min(toMins(start) + 60, 23 * 60 + 59))
+    setForm({
+      ...EMPTY_FORM(), date: date || today, startTime: start, endTime: end,
+      calendarId: (writableCals.find(c => c.primary) || writableCals[0])?.id || 'primary',
+    })
+  }
+  const openEdit  = e => setForm({
+    title: e.title, date: e.date, startTime: e.time || '09:00', endTime: e.endTime || '10:00',
+    allDay: e.allDay, calendarId: e.calendarId, _id: e.googleEventId,
+    spanDays: e.allDay && e.endDate ? daysBetween(e.date, e.endDate) : 1,
+  })
   const closeForm = () => { setForm(null); setErr(null) }
 
   const handleSave = async () => {
@@ -121,9 +163,7 @@ export default function CalendarTab() {
     const rect = ev.currentTarget.getBoundingClientRect()
     const y    = ev.clientY - rect.top
     const rawMins = Math.round(((y / PX_PER_HOUR) * 60 + HOUR_START * 60) / 15) * 15
-    const h = pad(Math.floor(rawMins / 60))
-    const m = pad(rawMins % 60)
-    openNew(ds, `${h}:${m}`)
+    openNew(ds, fromMins(Math.min(Math.max(rawMins, 0), 23 * 60)))
   }
 
   const rangeLabel = (() => {
@@ -139,9 +179,9 @@ export default function CalendarTab() {
     <div className="cal-tab">
       {/* Header */}
       <div className="cal-tab-header">
-        <button className="cal-nav-btn" onClick={() => setOffset(o => o - 1)}>‹</button>
+        <button className="cal-nav-btn" onClick={() => setOffset(o => o - 1)} aria-label="Previous days">‹</button>
         <span className="cal-range-label">{rangeLabel}</span>
-        <button className="cal-nav-btn" onClick={() => setOffset(o => o + 1)}>›</button>
+        <button className="cal-nav-btn" onClick={() => setOffset(o => o + 1)} aria-label="Next days">›</button>
         {offset !== 0 && <button className="cal-today-btn" onClick={() => setOffset(0)}>Today</button>}
         <div style={{ flex: 1 }} />
         {!cal.isSignedIn
@@ -149,6 +189,13 @@ export default function CalendarTab() {
           : <button className="add-evt-btn" onClick={() => openNew()}>+ Event</button>
         }
       </div>
+
+      {cal.error && (
+        <div className="cal-error" role="alert">
+          <span>{cal.error}</span>
+          {cal.isSignedIn && <button className="cal-error-retry" onClick={cal.refetch}>Retry</button>}
+        </div>
+      )}
 
       {/* Day column headers */}
       <div className="cal-day-headers">
@@ -164,6 +211,30 @@ export default function CalendarTab() {
           )
         })}
       </div>
+
+      {hasAllDay && (
+        <div className="cal-allday">
+          <div className="cal-gutter cal-allday-lbl">all day</div>
+          {days.map(d => {
+            const ds = dateStr(d)
+            return (
+              <div key={ds} className="cal-allday-cell">
+                {allDayByDate[ds].map(e => (
+                  <button
+                    key={e.id}
+                    className="cal-allday-evt"
+                    style={{ background: e.color + 'DD', borderLeft: `3px solid ${e.color}` }}
+                    onClick={() => openEdit(e)}
+                    aria-label={`${e.title}, all day`}
+                  >
+                    {e.title}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Scrollable grid */}
       <div className="cal-scroll" ref={scrollRef}>
@@ -231,15 +302,15 @@ export default function CalendarTab() {
       {/* Event form sheet */}
       {form && (
         <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && closeForm()}>
-          <div className="sheet">
+          <div className="sheet" role="dialog" aria-modal="true" aria-label={form._id ? 'Edit event' : 'New event'}>
             <div className="sheet-handle" />
             <div className="sheet-header">
               <span className="sheet-title">{form._id ? 'Edit Event' : 'New Event'}</span>
-              <button className="sheet-close" onClick={closeForm}>✕</button>
+              <button className="sheet-close" onClick={closeForm} aria-label="Close">✕</button>
             </div>
 
             <div className="sheet-body">
-              <input className="sheet-input sheet-input--title" placeholder="Event title"
+              <input className="sheet-input sheet-input--title" placeholder="Event title" aria-label="Event title"
                 value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
                 autoFocus autoCapitalize="sentences" />
 
@@ -249,39 +320,39 @@ export default function CalendarTab() {
               </label>
 
               <div className="sheet-field">
-                <label className="sheet-label">Date</label>
-                <input type="date" className="sheet-input" value={form.date}
+                <label className="sheet-label" htmlFor="cal-form-date">Date</label>
+                <input id="cal-form-date" type="date" className="sheet-input" value={form.date}
                   onChange={e => setForm(f => ({...f, date: e.target.value}))} />
               </div>
 
               {!form.allDay && (
                 <div className="sheet-row">
                   <div className="sheet-field">
-                    <label className="sheet-label">Start</label>
-                    <input type="time" className="sheet-input" value={form.startTime}
+                    <label className="sheet-label" htmlFor="cal-form-start">Start</label>
+                    <input id="cal-form-start" type="time" className="sheet-input" value={form.startTime}
                       onChange={e => setForm(f => ({...f, startTime: e.target.value}))} />
                   </div>
                   <div className="sheet-field">
-                    <label className="sheet-label">End</label>
-                    <input type="time" className="sheet-input" value={form.endTime}
+                    <label className="sheet-label" htmlFor="cal-form-end">End</label>
+                    <input id="cal-form-end" type="time" className="sheet-input" value={form.endTime}
                       onChange={e => setForm(f => ({...f, endTime: e.target.value}))} />
                   </div>
                 </div>
               )}
 
-              {cal.calendarList.length > 0 && !form._id && (
+              {writableCals.length > 0 && !form._id && (
                 <div className="sheet-field">
-                  <label className="sheet-label">Calendar</label>
-                  <select className="sheet-input" value={form.calendarId}
+                  <label className="sheet-label" htmlFor="cal-form-calendar">Calendar</label>
+                  <select id="cal-form-calendar" className="sheet-input" value={form.calendarId}
                     onChange={e => setForm(f => ({...f, calendarId: e.target.value}))}>
-                    {cal.calendarList.map(c => (
+                    {writableCals.map(c => (
                       <option key={c.id} value={c.id}>{c.summary}{c.primary ? ' (primary)' : ''}</option>
                     ))}
                   </select>
                 </div>
               )}
 
-              {err && <p className="sheet-error">{err}</p>}
+              {err && <p className="sheet-error" role="alert">{err}</p>}
             </div>
 
             <div className="sheet-footer">

@@ -3,20 +3,49 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events openid email profile'
 const GCAL   = 'https://www.googleapis.com/calendar/v3'
 
-function nextDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+const pad = (n) => String(n).padStart(2, '0')
+const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const localTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+// Built from local date parts: toISOString() converts to UTC first, which
+// lands on the wrong day for anyone east of Greenwich.
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return localDate(new Date(y, m - 1, d + n))
 }
 
-function toGoogleBody({ title, date, startTime, endTime, allDay }) {
+function toGoogleBody({ title, date, startTime, endTime, allDay, spanDays }, patch = false) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  if (allDay) return { summary: title, start: { date }, end: { date: nextDay(date) } }
+  // On PATCH the other half of start/end has to be nulled explicitly, or
+  // switching between all-day and timed leaves both `date` and `dateTime`
+  // set and Google rejects the request.
+  if (allDay) {
+    const clear = patch ? { dateTime: null, timeZone: null } : {}
+    return {
+      summary: title,
+      start: { date, ...clear },
+      end:   { date: addDays(date, Math.max(1, spanDays || 1)), ...clear },
+    }
+  }
+  const clear = patch ? { date: null } : {}
   return {
     summary: title,
-    start: { dateTime: `${date}T${startTime}:00`, timeZone: tz },
-    end:   { dateTime: `${date}T${endTime || startTime}:00`, timeZone: tz },
+    start: { dateTime: `${date}T${startTime}:00`, timeZone: tz, ...clear },
+    end:   { dateTime: `${date}T${endTime || startTime}:00`, timeZone: tz, ...clear },
   }
+}
+
+function defaultRange() {
+  const now = new Date()
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    end:   new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString(),
+  }
+}
+
+const ERROR_TEXT = {
+  session_expired:     'Calendar session expired. Try again in a moment.',
+  insufficient_scopes: 'Calendar permission needed. Reconnect your calendar.',
 }
 
 export function useGoogleCalendar(clientId, storageKey = 'companion') {
@@ -28,11 +57,13 @@ export function useGoogleCalendar(clientId, storageKey = 'companion') {
   const [user, setUser]            = useState(() => { try { return JSON.parse(sessionStorage.getItem(userKey) || 'null') } catch { return null } })
   const [events, setEvents]        = useState([])
   const [calendarList, setCalList] = useState([])
+  const [range, setRangeState]     = useState(defaultRange)
   const [loading, setLoading]      = useState(false)
   const [error, setError]          = useState(null)
   const clientRef                  = useRef(null)
   const silentRef                  = useRef(null)
-  const fetchDebounceRef           = useRef(null)
+  const fetchSeqRef                = useRef(0)
+  const [reloadKey, setReloadKey]  = useState(0)
 
   const onToken = useCallback((accessToken) => {
     sessionStorage.setItem(tokenKey, accessToken)
@@ -99,86 +130,129 @@ export function useGoogleCalendar(clientId, storageKey = 'companion') {
     setToken(null); setUser(null); setEvents([]); setCalList([])
   }, [token])
 
-  const fetchAll = useCallback(async (tk) => {
-    setLoading(true); setError(null)
-    const get = (url) => fetch(url, { headers: { Authorization: `Bearer ${tk}` } }).then(async r => {
-      if (r.status === 401) { trySilentRefresh(); throw new Error('session_expired') }
-      if (r.status === 403) {
-        const body = await r.json().catch(() => ({}))
-        if (body?.error?.status === 'PERMISSION_DENIED' || body?.error?.errors?.[0]?.reason === 'insufficientPermissions') {
-          forceReauth(); throw new Error('insufficient_scopes')
-        }
-      }
-      return r.json()
-    })
+  // One request path for reads and writes. Rejects on any non-2xx with the
+  // API's own message, so a failed save can never look like a success.
+  const api = useCallback(async (tk, url, opts = {}) => {
+    let r
     try {
-      const uInfo = await get('https://www.googleapis.com/oauth2/v3/userinfo')
-      if (uInfo.email) {
-        const u = { name: uInfo.given_name || uInfo.name, picture: uInfo.picture }
-        sessionStorage.setItem(userKey, JSON.stringify(u))
-        setUser(u)
+      r = await fetch(url, { ...opts, headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json', ...opts.headers } })
+    } catch {
+      throw new Error('No connection. Check your signal and try again.')
+    }
+    if (r.status === 401) { trySilentRefresh(); throw new Error('session_expired') }
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}))
+      if (r.status === 403 && (body?.error?.status === 'PERMISSION_DENIED' || body?.error?.errors?.[0]?.reason === 'insufficientPermissions')) {
+        forceReauth(); throw new Error('insufficient_scopes')
       }
+      throw new Error(body?.error?.message || `Calendar request failed (${r.status})`)
+    }
+    if (r.status === 204) return null
+    return r.json()
+  }, [trySilentRefresh, forceReauth])
 
-      const calData = await get(`${GCAL}/users/me/calendarList?maxResults=50`)
-      const cals    = calData.items || []
-      setCalList(cals.map(c => ({ id: c.id, summary: c.summary, primary: !!c.primary })))
-
-      const now   = new Date()
-      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const end   = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
-
-      const batches = await Promise.all(cals.map(cal =>
-        get(`${GCAL}/calendars/${encodeURIComponent(cal.id)}/events?timeMin=${encodeURIComponent(start)}&timeMax=${encodeURIComponent(end)}&singleEvents=true&orderBy=startTime&maxResults=100`)
-          .then(d => (d.items || []).filter(e => e.status !== 'cancelled' && (e.start?.date || e.start?.dateTime)).map(e => {
-            const dt   = new Date(e.start.dateTime || e.start.date + 'T00:00:00')
-            const date = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
-            const time = e.start.dateTime ? `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}` : null
-            const endDt   = e.end?.dateTime ? new Date(e.end.dateTime) : null
-            const endTime = endDt ? `${String(endDt.getHours()).padStart(2,'0')}:${String(endDt.getMinutes()).padStart(2,'0')}` : null
-            return { id: `${storageKey}::${cal.id}::${e.id}`, googleEventId: e.id, calendarId: cal.id, title: e.summary || '(No title)', date, time, endTime, allDay: !!e.start.date, color: cal.backgroundColor || '#4A90D9' }
-          })).catch(() => [])
-      ))
-      setEvents(batches.flat())
-    } catch (e) {
-      if (e.message !== 'session_expired' && e.message !== 'insufficient_scopes') setError(e.message)
-    } finally { setLoading(false) }
-  }, [storageKey, trySilentRefresh, forceReauth])
-
-  useEffect(() => { if (token) fetchAll(token) }, [token, fetchAll])
-
-  const authFetch = useCallback((url, opts = {}) =>
-    fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...opts.headers } })
-      .then(async r => {
-        if (r.status === 401) { trySilentRefresh(); throw new Error('session_expired') }
-        if (r.status === 403) {
-          const body = await r.json().catch(() => ({}))
-          if (body?.error?.status === 'PERMISSION_DENIED' || body?.error?.errors?.[0]?.reason === 'insufficientPermissions') {
-            forceReauth(); throw new Error('insufficient_scopes')
-          }
+  // Profile and calendar list: once per token.
+  useEffect(() => {
+    if (!token) return
+    let stale = false
+    ;(async () => {
+      try {
+        const uInfo = await api(token, 'https://www.googleapis.com/oauth2/v3/userinfo')
+        if (stale) return
+        if (uInfo.email) {
+          const u = { name: uInfo.given_name || uInfo.name, picture: uInfo.picture }
+          sessionStorage.setItem(userKey, JSON.stringify(u))
+          setUser(u)
         }
-        if (r.status === 204) return null
-        return r.json()
-      }), [token, trySilentRefresh, forceReauth])
+        const calData = await api(token, `${GCAL}/users/me/calendarList?maxResults=50`)
+        if (stale) return
+        setCalList((calData.items || []).map(c => ({
+          id: c.id, summary: c.summary, primary: !!c.primary,
+          accessRole: c.accessRole, backgroundColor: c.backgroundColor,
+        })))
+      } catch (e) {
+        if (!stale && !ERROR_TEXT[e.message]) setError(e.message)
+      }
+    })()
+    return () => { stale = true }
+  }, [token, api])
 
-  const debouncedFetch = useCallback((tk) => {
-    clearTimeout(fetchDebounceRef.current)
-    fetchDebounceRef.current = setTimeout(() => fetchAll(tk), 400)
-  }, [fetchAll])
+  // Events: whenever the token, the calendars or the requested range change.
+  // Debounced so paging quickly through days sends one request per calendar,
+  // not one per tap.
+  useEffect(() => {
+    if (!token || !calendarList.length) return
+    const seq = ++fetchSeqRef.current
+    const timer = setTimeout(async () => {
+      setLoading(true); setError(null)
+      const qs = `timeMin=${encodeURIComponent(range.start)}&timeMax=${encodeURIComponent(range.end)}&singleEvents=true&orderBy=startTime&maxResults=250`
+      let failed = 0
+      let fatal  = null
+      const batches = await Promise.all(calendarList.map(cal =>
+        api(token, `${GCAL}/calendars/${encodeURIComponent(cal.id)}/events?${qs}`)
+          .then(d => (d.items || []).filter(e => e.status !== 'cancelled' && (e.start?.date || e.start?.dateTime)).map(e => {
+            const allDay = !!e.start.date
+            const dt     = new Date(e.start.dateTime || e.start.date + 'T00:00:00')
+            const endDt  = e.end?.dateTime ? new Date(e.end.dateTime) : null
+            return {
+              id: `${storageKey}::${cal.id}::${e.id}`, googleEventId: e.id, calendarId: cal.id,
+              title: e.summary || '(No title)',
+              date: localDate(dt),
+              time: allDay ? null : localTime(dt),
+              endTime: endDt ? localTime(endDt) : null,
+              allDay,
+              // Google's all-day end date is exclusive.
+              endDate: allDay ? (e.end?.date || addDays(e.start.date, 1)) : null,
+              color: cal.backgroundColor || '#4A90D9',
+            }
+          }))
+          .catch(err => {
+            if (ERROR_TEXT[err.message]) fatal = err; else failed++
+            return []
+          })
+      ))
+      if (seq !== fetchSeqRef.current) return
+      setLoading(false)
+      // Token is being refreshed or re-requested; keep what is on screen.
+      if (fatal) return
+      if (failed === calendarList.length) { setError('Could not load calendar events.'); return }
+      setEvents(batches.flat())
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [token, calendarList, range, reloadKey, storageKey, api])
 
-  const createEvent = async (calendarId = 'primary', data) => {
-    await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events`, { method: 'POST', body: JSON.stringify(toGoogleBody(data)) })
-    debouncedFetch(token)
+  const refetch = useCallback(() => setReloadKey(k => k + 1), [])
+
+  /** Ask for events between two Dates (end exclusive). */
+  const setRange = useCallback((start, end) => {
+    const next = { start: start.toISOString(), end: end.toISOString() }
+    setRangeState(prev => (prev.start === next.start && prev.end === next.end ? prev : next))
+  }, [])
+
+  const write = async (url, opts) => {
+    try {
+      const res = await api(token, url, opts)
+      refetch()
+      return res
+    } catch (e) {
+      throw new Error(ERROR_TEXT[e.message] || e.message)
+    }
   }
 
-  const updateEvent = async (calendarId, eventId, data) => {
-    await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { method: 'PUT', body: JSON.stringify(toGoogleBody(data)) })
-    debouncedFetch(token)
-  }
+  const eventUrl = (calendarId, eventId) =>
+    `${GCAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
 
-  const deleteEvent = async (calendarId, eventId) => {
-    await authFetch(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
-    debouncedFetch(token)
-  }
+  const createEvent = (calendarId = 'primary', data) =>
+    write(`${GCAL}/calendars/${encodeURIComponent(calendarId)}/events`, { method: 'POST', body: JSON.stringify(toGoogleBody(data)) })
 
-  return { isSignedIn: !!token, signIn, signOut, user, events, calendarList, loading, error, createEvent, updateEvent, deleteEvent, refetch: () => token && fetchAll(token) }
+  // PATCH, not PUT: PUT replaces the whole event, and this form only knows
+  // the title and times, so it wiped location, description, guests and
+  // reminders on every edit.
+  const updateEvent = (calendarId, eventId, data) =>
+    write(eventUrl(calendarId, eventId), { method: 'PATCH', body: JSON.stringify(toGoogleBody(data, true)) })
+
+  const deleteEvent = (calendarId, eventId) =>
+    write(eventUrl(calendarId, eventId), { method: 'DELETE' })
+
+  return { isSignedIn: !!token, signIn, signOut, user, events, calendarList, loading, error, createEvent, updateEvent, deleteEvent, refetch, setRange }
 }

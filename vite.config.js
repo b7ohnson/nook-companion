@@ -9,7 +9,10 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
-      registerType: 'autoUpdate',
+      // main.jsx registers through virtual:pwa-register and prompts before
+      // reloading; null stops the plugin injecting a second registration.
+      registerType: 'prompt',
+      injectRegister: null,
       manifest: {
         name: 'NooK',
         short_name: 'NooK',
