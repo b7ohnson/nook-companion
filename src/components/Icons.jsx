@@ -278,6 +278,14 @@ export function IconPlus({ size }) {
   )
 }
 
+export function IconChevronLeft({ size }) {
+  return (
+    <Svg size={size}>
+      <polyline points="15 18 9 12 15 6" />
+    </Svg>
+  )
+}
+
 export function IconChevronRight({ size }) {
   return (
     <Svg size={size}>

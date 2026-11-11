@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGallery } from '../hooks/useGallery'
-import { IconUploadCloud, IconTrash2, IconImage } from './Icons'
+import { IconUploadCloud, IconTrash2, IconImage, IconX } from './Icons'
 
 export default function GalleryPanel({ onClose }) {
   const { photos, upload, remove, uploading, progress, lastUpload, clearLastUpload } = useGallery()
@@ -33,7 +33,7 @@ export default function GalleryPanel({ onClose }) {
       <div className="gallery-panel" onClick={e => e.stopPropagation()}>
         <div className="gallery-panel-header">
           <span className="gallery-panel-title">Photo Gallery</span>
-          <button className="gallery-panel-close" onClick={onClose} aria-label="Close gallery">✕</button>
+          <button className="gallery-panel-close" onClick={onClose} aria-label="Close gallery"><IconX size={20} /></button>
         </div>
 
         <p className="gallery-panel-sub">
@@ -53,7 +53,7 @@ export default function GalleryPanel({ onClose }) {
               <span>
                 {lastUpload.uploaded} of {lastUpload.total} uploaded, {lastUpload.failed} failed
               </span>
-              <button className="gallery-upload-result-close" onClick={clearLastUpload} aria-label="Dismiss upload errors">✕</button>
+              <button className="gallery-upload-result-close" onClick={clearLastUpload} aria-label="Dismiss upload errors"><IconX size={16} /></button>
             </div>
             <ul className="gallery-upload-result-list">
               {lastUpload.failures.map((f, i) => (

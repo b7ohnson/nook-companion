@@ -10,7 +10,7 @@ import GroceriesTab from './components/GroceriesTab'
 import CalendarTab from './components/CalendarTab'
 import MenuManager from './components/MenuManager'
 import ToastNotifications from './components/ToastNotifications'
-import { IconHome, IconCheckSquare, IconShoppingCart, IconCalendar, IconSun, IconMoon, IconCamera, IconUtensils, IconBell } from './components/Icons'
+import { IconHome, IconCheckSquare, IconShoppingCart, IconCalendar, IconSun, IconMoon, IconCamera, IconUtensils, IconBell, IconX } from './components/Icons'
 
 const GalleryPanel  = lazy(() => import('./components/GalleryPanel'))
 const PlayRoom      = lazy(() => import('./components/PlayRoom'))
@@ -196,7 +196,7 @@ function SignedInApp({ user, logOut, dark, toggleDark }) {
             <div className="sheet-handle" />
             <div className="sheet-header">
               <span className="sheet-title">Sign out of NooK?</span>
-              <button className="sheet-close" onClick={() => setConfirmSignOut(false)} aria-label="Close">✕</button>
+              <button className="sheet-close" onClick={() => setConfirmSignOut(false)} aria-label="Close"><IconX size={18} /></button>
             </div>
             <div className="sheet-body">
               <p className="signout-who">Signed in as {user.displayName || user.email || 'this account'}.</p>

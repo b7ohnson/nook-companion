@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { WEEK_START_DAY } from 'nook-core/constants'
 import { useMeals } from '../hooks/useMeals'
+import { IconX, IconChevronLeft, IconChevronRight, IconCloudOff } from './Icons'
 
 const SLOTS = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -80,9 +81,10 @@ export default function MenuManager() {
       {/* Header */}
       <div className="tab-header">
         <h2 className="tab-title">Menu</h2>
-        <span className={!synced || status === 'offline' ? 'sync-err' : status === 'saving' ? 'sync-busy' : 'sync-ok'}>
-          {!synced ? '…' : status === 'offline' ? '⚠ offline' : status === 'saving' ? '● saving' : '● live'}
-        </span>
+        {!synced ? <span className="sync-note">Loading…</span>
+          : status === 'offline' ? <span className="sync-note sync-note--offline"><IconCloudOff size={14} /> Offline</span>
+          : status === 'saving' ? <span className="sync-note">Saving…</span>
+          : null}
       </div>
 
       {/* Week navigation */}
@@ -91,13 +93,13 @@ export default function MenuManager() {
           className="menu-nav-btn"
           onClick={() => setWeekOffset(o => o - 1)}
           aria-label="Previous week"
-        >‹</button>
+        ><IconChevronLeft size={20} /></button>
         <span className="menu-week-label">{weekLabel(weekOffset, days)}</span>
         <button
           className="menu-nav-btn"
           onClick={() => setWeekOffset(o => o + 1)}
           aria-label="Next week"
-        >›</button>
+        ><IconChevronRight size={20} /></button>
       </div>
 
       {/* Day cards */}
@@ -153,7 +155,7 @@ export default function MenuManager() {
                 {' · '}
                 {editing.fullDayName}
               </span>
-              <button className="sheet-close" onClick={closeEdit} aria-label="Close">✕</button>
+              <button className="sheet-close" onClick={closeEdit} aria-label="Close"><IconX size={18} /></button>
             </div>
             <div className="sheet-body">
               <input

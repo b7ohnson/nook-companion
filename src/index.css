@@ -1196,7 +1196,7 @@ input  { font-family: var(--font); }
   font-weight: 900;
 }
 .play-reveal--correct { background: #dcfce7; color: #166534; }
-.play-reveal--wrong   { background: #fee2e2; color: #991b1b; }
+.play-reveal--wrong   { background: var(--red-tint); color: var(--red); }
 [data-theme="dark"] .play-reveal--correct { background: #052e16; color: #86efac; }
 [data-theme="dark"] .play-reveal--wrong   { background: #450a0a; color: #fca5a5; }
 
@@ -1390,7 +1390,7 @@ input  { font-family: var(--font); }
 }
 .hu-btn:active { transform: scale(0.97); }
 
-.hu-btn--skip    { background: #fee2e2; color: #991b1b; }
+.hu-btn--skip    { background: var(--red-tint); color: var(--red); }
 .hu-btn--correct { background: #dcfce7; color: #166534; }
 [data-theme="dark"] .hu-btn--skip    { background: #450a0a; color: #fca5a5; }
 [data-theme="dark"] .hu-btn--correct { background: #052e16; color: #86efac; }
@@ -1606,7 +1606,7 @@ input  { font-family: var(--font); }
   border-radius: 16px;
 }
 .play-verdict--correct { background: #dcfce7; color: #166534; }
-.play-verdict--wrong   { background: #fee2e2; color: #991b1b; }
+.play-verdict--wrong   { background: var(--red-tint); color: var(--red); }
 [data-theme="dark"] .play-verdict--correct { background: #052e16; color: #86efac; }
 [data-theme="dark"] .play-verdict--wrong   { background: #450a0a; color: #fca5a5; }
 
@@ -2667,11 +2667,11 @@ ul.item-list { list-style: none; padding: 0; margin: 0; }
    Sync status, gallery upload results, calendar all-day strip and errors,
    toast action button, notification prompt, sign-out confirm, error screen.
 ───────────────────────────────────────── */
-.sync-busy { font-size: 0.65rem; color: #d97706; font-weight: 700; }
+.sync-busy { font-size: 0.65rem; color: var(--amber-ink); font-weight: 700; }
 
 .gallery-upload-result {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--red-tint);
+  color: var(--red);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 0.8rem;
@@ -2705,8 +2705,8 @@ ul.item-list { list-style: none; padding: 0; margin: 0; }
   justify-content: space-between;
   gap: 8px;
   padding: 8px 12px;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--red-tint);
+  color: var(--red);
   font-size: 0.78rem;
   flex-shrink: 0;
 }

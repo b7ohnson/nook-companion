@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar'
+import { IconX, IconChevronLeft, IconChevronRight } from './Icons'
 
 const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID
 const HOUR_START  = 6
@@ -179,9 +180,9 @@ export default function CalendarTab() {
     <div className="cal-tab">
       {/* Header */}
       <div className="cal-tab-header">
-        <button className="cal-nav-btn" onClick={() => setOffset(o => o - 1)} aria-label="Previous days">‹</button>
+        <button className="cal-nav-btn" onClick={() => setOffset(o => o - 1)} aria-label="Previous days"><IconChevronLeft size={20} /></button>
         <span className="cal-range-label">{rangeLabel}</span>
-        <button className="cal-nav-btn" onClick={() => setOffset(o => o + 1)} aria-label="Next days">›</button>
+        <button className="cal-nav-btn" onClick={() => setOffset(o => o + 1)} aria-label="Next days"><IconChevronRight size={20} /></button>
         {offset !== 0 && <button className="cal-today-btn" onClick={() => setOffset(0)}>Today</button>}
         <div style={{ flex: 1 }} />
         {!cal.isSignedIn
@@ -306,7 +307,7 @@ export default function CalendarTab() {
             <div className="sheet-handle" />
             <div className="sheet-header">
               <span className="sheet-title">{form._id ? 'Edit Event' : 'New Event'}</span>
-              <button className="sheet-close" onClick={closeForm} aria-label="Close">✕</button>
+              <button className="sheet-close" onClick={closeForm} aria-label="Close"><IconX size={18} /></button>
             </div>
 
             <div className="sheet-body">
@@ -361,7 +362,7 @@ export default function CalendarTab() {
                   className="sheet-btn sheet-btn--delete"
                   onClick={handleDelete}
                   disabled={saving}
-                  style={confirmDelete ? { color: '#c53030' } : undefined}
+                  style={confirmDelete ? { color: 'var(--red)' } : undefined}
                 >
                   {confirmDelete ? 'Confirm delete?' : 'Delete event'}
                 </button>
