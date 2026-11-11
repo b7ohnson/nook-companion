@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useGroceries } from '../hooks/useGroceries'
+import { IconCheck, IconX, IconPlus, IconCloudOff } from './Icons'
+
+// Quiet while live; only says something when it is saving or offline.
+function SyncNote({ synced, status }) {
+  if (!synced) return <span className="sync-note">Loading…</span>
+  if (status === 'offline') return <span className="sync-note sync-note--offline"><IconCloudOff size={14} /> Offline</span>
+  if (status === 'saving') return <span className="sync-note">Saving…</span>
+  return null
+}
 
 export default function GroceriesTab() {
-  const { items, synced, error, add, toggle, remove, clearDone, remoteUpdate } = useGroceries()
+  const { items, synced, status, add, toggle, remove, clearDone, remoteUpdate } = useGroceries()
   const [input, setInput]           = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
@@ -28,10 +37,10 @@ export default function GroceriesTab() {
       <div className="tab-header">
         <h2 className="tab-title">Groceries</h2>
         <div className="tab-header-right">
+          <SyncNote synced={synced} status={status} />
           {doneCount > 0 && (
             <button
-              className="clear-btn"
-              style={confirmClear ? { color: '#c53030' } : {}}
+              className={`clear-btn ${confirmClear ? 'clear-btn--confirm' : ''}`}
               onClick={() => {
                 if (confirmClear) {
                   clearDone()
@@ -42,50 +51,56 @@ export default function GroceriesTab() {
                 }
               }}
             >
-              {confirmClear ? 'Confirm? Tap again' : `Clear ${doneCount} ✓`}
+              {confirmClear ? 'Tap again to clear' : `Clear ${doneCount} bought`}
             </button>
           )}
-          <span className={synced ? 'sync-ok' : 'sync-err'}>
-            {error ? '⚠ offline' : synced ? '● live' : '…'}
-          </span>
         </div>
       </div>
-
-      {showBanner && (
-        <div className="remote-update-banner">List updated ↑</div>
-      )}
-
-      <ul className="item-list">
-        {items.length === 0 && (
-          <p className="empty-msg">Nothing on the list</p>
-        )}
-        {items.map(item => (
-          <li key={item.id} className={`item-row ${item.done ? 'item-row--done' : ''}`}>
-            <button
-              className={`item-check ${item.done ? 'item-check--done' : ''}`}
-              style={item.done ? { background: '#22c55e', borderColor: '#22c55e' } : {}}
-              aria-label={item.done ? `Uncheck ${item.name}` : `Check off ${item.name}`}
-              onClick={() => toggle(item.id)}
-            >
-              {item.done ? '✓' : ''}
-            </button>
-            <span className="item-label">{item.name}</span>
-            <button className="item-del" aria-label={`Remove ${item.name}`} onClick={() => remove(item.id)}>✕</button>
-          </li>
-        ))}
-      </ul>
 
       <div className="add-row">
         <input
           className="add-input"
-          placeholder="Add item…"
+          placeholder="Add to the list"
+          aria-label="Grocery item"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && submit()}
           autoCapitalize="sentences"
+          enterKeyHint="done"
         />
-        <button className="add-btn" style={{ background: '#22c55e' }} onClick={submit}>+</button>
+        <button className="add-btn" aria-label="Add item" disabled={!input.trim()} onClick={submit}>
+          <IconPlus size={22} />
+        </button>
       </div>
+
+      {showBanner && (
+        <div className="remote-update-banner" role="status">List updated.</div>
+      )}
+
+      {synced && items.length === 0 ? (
+        <p className="empty-msg">Nothing to buy.</p>
+      ) : (
+        <ul className="item-list">
+          {items.map(item => (
+            <li key={item.id} className={`item-row ${item.done ? 'item-row--done' : ''}`}>
+              <button
+                className="item-check"
+                aria-label={item.done ? `Put ${item.name} back on the list` : `Mark ${item.name} bought`}
+                aria-pressed={item.done}
+                onClick={() => toggle(item.id)}
+              >
+                <span className={`item-check-box ${item.done ? 'item-check-box--done' : ''}`}>
+                  {item.done && <IconCheck size={14} />}
+                </span>
+              </button>
+              <span className="item-label">{item.name}</span>
+              <button className="item-del" aria-label={`Remove ${item.name}`} onClick={() => remove(item.id)}>
+                <IconX size={18} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

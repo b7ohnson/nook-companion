@@ -259,3 +259,65 @@ export function IconUploadCloud({ size }) {
     </Svg>
   )
 }
+
+export function IconX({ size }) {
+  return (
+    <Svg size={size}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </Svg>
+  )
+}
+
+export function IconPlus({ size }) {
+  return (
+    <Svg size={size}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </Svg>
+  )
+}
+
+export function IconChevronRight({ size }) {
+  return (
+    <Svg size={size}>
+      <polyline points="9 18 15 12 9 6" />
+    </Svg>
+  )
+}
+
+export function IconRepeat({ size }) {
+  return (
+    <Svg size={size}>
+      <polyline points="17 1 21 5 17 9" />
+      <path d="M3 11V9a4 4 0 014-4h14" />
+      <polyline points="7 23 3 19 7 15" />
+      <path d="M21 13v2a4 4 0 01-4 4H3" />
+    </Svg>
+  )
+}
+
+export function IconCloudOff({ size }) {
+  return (
+    <Svg size={size}>
+      <path d="M22.61 16.95A5 5 0 0018 10h-1.26a8 8 0 00-7.05-6M5 5a8 8 0 004 15h9a5 5 0 001.7-.3" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </Svg>
+  )
+}
+
+// The NooK logo mark (an arched doorway with two figures), same geometry as
+// the one drawn in the app bar. Brand colours are fixed, not currentColor.
+export function NookMark({ size = 32 }) {
+  return (
+    <svg width={size * 64 / 74} height={size} viewBox="0 0 64 74" aria-hidden="true" focusable="false">
+      <path d="M7,70 L7,31 C7,14 19,5 32,5 C45,5 57,14 57,31 L57,70"
+            stroke="#F0A500" strokeWidth="3.5" fill="none"
+            strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="3" y1="70" x2="61" y2="70"
+            stroke="#F0A500" strokeWidth="3.5" strokeLinecap="round" />
+      <circle cx="21" cy="40" r="10" fill="#4A7FA5" />
+      <circle cx="43" cy="40" r="10" fill="#F0A500" />
+    </svg>
+  )
+}

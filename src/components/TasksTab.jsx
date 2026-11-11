@@ -1,30 +1,43 @@
 import { useState, useRef, useEffect } from 'react'
+import { nextMidnight, nextWeekStart, nextMonthStart } from 'nook-core/recurrence'
 import { useTasks } from '../hooks/useTasks'
-import { IconAlertTriangle, IconCheck } from './Icons'
+import { IconCheck, IconX, IconPlus, IconChevronRight, IconRepeat, IconCloudOff } from './Icons'
 
+// Colours are theme tokens so each person reads correctly in light and dark.
 const PEOPLE = [
-  { id: 'blessing', label: 'Blessing', color: '#3B82F6' },
-  { id: 'pearl',    label: 'Pearl',    color: '#A855F7' },
+  { id: 'blessing', label: 'Blessing', color: 'var(--p-blessing)' },
+  { id: 'pearl',    label: 'Pearl',    color: 'var(--p-pearl)'    },
 ]
 
 const RECURRENCE_OPTS = [
-  { value: 'none',    label: 'Once',    icon: '1×',  desc: 'No repeat' },
-  { value: 'daily',   label: 'Daily',   icon: '↻',   desc: 'Every day' },
-  { value: 'weekly',  label: 'Weekly',  icon: '↻',   desc: 'Every week' },
-  { value: 'monthly', label: 'Monthly', icon: '↻',   desc: 'Every month' },
+  { value: 'none',    label: 'Once',    desc: 'No repeat' },
+  { value: 'daily',   label: 'Daily',   desc: 'Every day' },
+  { value: 'weekly',  label: 'Weekly',  desc: 'Every week' },
+  { value: 'monthly', label: 'Monthly', desc: 'Every month' },
 ]
 
 const RECUR_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
-const RECUR_COLOR = { daily: '#f59e0b', weekly: '#3b82f6', monthly: '#8b5cf6' }
 
-function nextReset(task) {
-  if (!task.recurrence || task.recurrence === 'none' || !task.completedAt) return ''
-  const MS = { daily: 86400000, weekly: 604800000, monthly: 2592000000 }
-  const diff = task.completedAt + (MS[task.recurrence] || 0) - Date.now()
-  if (diff <= 0) return 'resetting…'
-  const d = Math.floor(diff / 86400000)
-  const h = Math.floor(diff / 3600000)
-  return d >= 1 ? `resets in ${d}d` : `resets in ${h}h`
+// The same boundaries useTasks resets on: next midnight, next Sunday, the 1st.
+const BOUNDARY = { daily: nextMidnight, weekly: nextWeekStart, monthly: nextMonthStart }
+
+function resetLabel(task, now = Date.now()) {
+  const boundary = BOUNDARY[task.recurrence]
+  if (!boundary || !task.completedAt) return ''
+  const at = boundary(task.completedAt)
+  if (at <= now) return 'back now'
+  if (at === nextMidnight(now)) return 'back tomorrow'
+  const when = new Date(at)
+  if (at - now < 7 * 86400000) return `back ${when.toLocaleDateString(undefined, { weekday: 'long' })}`
+  return `back ${when.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
+}
+
+// Quiet while live; only says something when it is saving or offline.
+function SyncNote({ synced, status }) {
+  if (!synced) return <span className="sync-note">Loading…</span>
+  if (status === 'offline') return <span className="sync-note sync-note--offline"><IconCloudOff size={14} /> Offline</span>
+  if (status === 'saving') return <span className="sync-note">Saving…</span>
+  return null
 }
 
 function AddModal({ person, onAdd, onClose }) {
@@ -87,8 +100,8 @@ function AddModal({ person, onAdd, onClose }) {
         onClick={e => e.stopPropagation()}
       >
         <div className="task-modal-header">
-          <span id="add-task-modal-title" className="task-modal-title">New Task</span>
-          <button className="task-modal-close" onClick={onClose}>✕</button>
+          <span id="add-task-modal-title" className="task-modal-title">New task for {person.label}</span>
+          <button className="task-modal-close" onClick={onClose} aria-label="Close"><IconX size={20} /></button>
         </div>
 
         <input
@@ -102,15 +115,13 @@ function AddModal({ person, onAdd, onClose }) {
           autoFocus
         />
 
-        <div className="task-modal-recur-label">Repeat?</div>
-        <div className="task-recur-grid">
+        <div className="task-modal-recur-label" id="task-recur-label">Repeats</div>
+        <div className="task-recur-grid" role="group" aria-labelledby="task-recur-label">
           {RECURRENCE_OPTS.map(o => (
             <button
               key={o.value}
               className={`task-recur-tile ${recurrence === o.value ? 'task-recur-tile--active' : ''}`}
-              style={recurrence === o.value
-                ? { borderColor: person.color, background: person.color + '18', color: person.color }
-                : {}}
+              aria-pressed={recurrence === o.value}
               onClick={() => setRecurrence(o.value)}
             >
               <span className="task-recur-tile-label">{o.label}</span>
@@ -121,11 +132,10 @@ function AddModal({ person, onAdd, onClose }) {
 
         <button
           className="task-modal-save"
-          style={{ background: canSubmit ? person.color : undefined }}
           disabled={!canSubmit}
           onClick={submit}
         >
-          Add Task
+          {text.trim() && recurrence === null ? 'Choose how often it repeats' : 'Add task'}
         </button>
       </div>
     </div>
@@ -133,7 +143,7 @@ function AddModal({ person, onAdd, onClose }) {
 }
 
 export default function TasksTab() {
-  const { tasks, synced, error, toggle, add, remove, clearArchive } = useTasks()
+  const { tasks, synced, status, toggle, add, remove, clearArchive } = useTasks()
   const [active, setActive]           = useState('blessing')
   const [showModal, setShowModal]     = useState(false)
   const [showArchive, setShowArchive] = useState(false)
@@ -164,116 +174,114 @@ export default function TasksTab() {
   }
 
   return (
-    <div className="tab-content tasks-tab">
-      {/* Header */}
+    <div className="tab-content tasks-tab" style={{ '--person': person.color, '--check': person.color }}>
       <div className="tab-header">
         <h2 className="tab-title">Tasks</h2>
-        <span className={synced ? 'sync-ok' : 'sync-err'}>
-          {error ? <><IconAlertTriangle size={12} /> offline</> : synced ? '● live' : '…'}
-        </span>
+        <SyncNote synced={synced} status={status} />
       </div>
 
-      {/* Person tabs */}
       <div className="person-tabs">
-        {PEOPLE.map(p => (
-          <button
-            key={p.id}
-            className={`person-tab ${active === p.id ? 'person-tab--active' : ''}`}
-            style={active === p.id ? { borderColor: p.color, color: p.color } : {}}
-            onClick={() => setActive(p.id)}
-          >
-            {p.label}
-          </button>
-        ))}
+        {PEOPLE.map(p => {
+          const left = (tasks[p.id] || []).filter(t => !t.done).length
+          return (
+            <button
+              key={p.id}
+              className={`person-tab ${active === p.id ? 'person-tab--active' : ''}`}
+              style={{ '--person': p.color }}
+              aria-pressed={active === p.id}
+              onClick={() => setActive(p.id)}
+            >
+              {p.label}{synced && left > 0 ? ` · ${left}` : ''}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Active tasks */}
-      <ul className="item-list">
-        {activeList.length === 0 && (
-          <p className="empty-msg">No tasks — tap + to add one</p>
-        )}
-        {activeList.map(item => (
-          <li key={item.id} className="item-row">
-            <button
-              className="item-check"
-              style={{ borderColor: person.color }}
-              aria-label={item.done ? `Uncheck ${item.task}` : `Complete ${item.task}`}
-              onClick={() => handleToggle(active, item)}
-            />
-            <div className="item-body">
-              <span className="item-label">{item.task}</span>
-              {item.recurrence && item.recurrence !== 'none' && (
-                <span
-                  className="item-recur-badge"
-                  style={{
-                    background: RECUR_COLOR[item.recurrence] + '22',
-                    color: RECUR_COLOR[item.recurrence],
-                    borderColor: RECUR_COLOR[item.recurrence] + '55',
-                  }}
-                >
-                  {RECUR_LABEL[item.recurrence]}
-                </span>
-              )}
-            </div>
-            <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>✕</button>
-          </li>
-        ))}
-      </ul>
+      {synced && activeList.length === 0 ? (
+        <p className="empty-msg">Nothing left for {person.label}.</p>
+      ) : (
+        <ul className="item-list">
+          {activeList.map(item => (
+            <li key={item.id} className="item-row">
+              <button
+                className="item-check"
+                aria-label={`Complete ${item.task}`}
+                onClick={() => handleToggle(active, item)}
+              >
+                <span className="item-check-box" />
+              </button>
+              <div className="item-body">
+                <span className="item-label">{item.task}</span>
+                {RECUR_LABEL[item.recurrence] && (
+                  <span className="item-recur"><IconRepeat size={12} /> {RECUR_LABEL[item.recurrence]}</span>
+                )}
+              </div>
+              <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>
+                <IconX size={18} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {/* Undo toast */}
       {undoItem && (
-        <div className="undo-banner">
-          <span>Task completed</span>
+        <div className="undo-banner" role="status">
+          <span>Done: {undoItem.task}</span>
           <button className="undo-btn" onClick={handleUndo}>Undo</button>
         </div>
       )}
 
-      {/* Archive */}
       {archiveList.length > 0 && (
         <div className="archive-section">
           <div className="archive-section-header">
-            <button className="archive-toggle" onClick={() => setShowArchive(v => !v)}>
-              {showArchive ? '▾' : '▸'} Completed ({archiveList.length})
+            <button
+              className="archive-toggle"
+              aria-expanded={showArchive}
+              aria-controls="task-archive"
+              onClick={() => setShowArchive(v => !v)}
+            >
+              <span className="archive-chevron"><IconChevronRight size={16} /></span>
+              Done ({archiveList.length})
             </button>
             {showArchive && (
               <button className="archive-clear" onClick={() => clearArchive(active)}>
-                Clear all
+                Clear done
               </button>
             )}
           </div>
           {showArchive && (
-            <div className="archive-list">
+            <ul className="item-list archive-list" id="task-archive">
               {archiveList.map(item => (
-                <div key={item.id} className="item-row item-row--done">
-                  <span className="item-check item-check--done" style={{ background: person.color, borderColor: person.color }}>
-                    <IconCheck size={12} />
+                <li key={item.id} className="item-row item-row--done">
+                  <span className="item-check" aria-hidden="true">
+                    <span className="item-check-box item-check-box--done"><IconCheck size={14} /></span>
                   </span>
                   <div className="item-body">
                     <span className="item-label item-label--done">{item.task}</span>
-                    {item.recurrence && item.recurrence !== 'none' && (
-                      <span className="item-recur-reset">
-                        {RECUR_LABEL[item.recurrence]} · {nextReset(item)}
+                    {RECUR_LABEL[item.recurrence] && (
+                      <span className="item-recur">
+                        <IconRepeat size={12} /> {RECUR_LABEL[item.recurrence]}, {resetLabel(item)}
                       </span>
                     )}
                   </div>
-                  <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>✕</button>
-                </div>
+                  <button className="item-del" aria-label={`Delete ${item.task}`} onClick={() => remove(active, item.id)}>
+                    <IconX size={18} />
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
 
-      {/* FAB */}
       <button
         className="tasks-fab"
-        style={{ background: person.color }}
+        aria-label={`Add a task for ${person.label}`}
         onClick={() => setShowModal(true)}
       >
-        +
+        <IconPlus size={26} />
       </button>
 
-      {/* Add modal */}
       {showModal && (
         <AddModal
           person={person}
