@@ -44,12 +44,12 @@ const IconPause = ({ size }) => (
   <LocalSvg size={size}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></LocalSvg>
 )
 
-// Unauthenticated guests may only change `players` (firestore.rules), so the
-// buzz/answer writes into `payload` are refused for them until the rules
-// allow it. Say so plainly instead of the button silently doing nothing.
+// Guests may write only the buzz/answer keys of `payload`, and only while the
+// room is live (firestore.rules), so a refusal here almost always means the
+// game has ended or someone else already reopened or closed the buzzers.
 function payloadWriteMessage(err, what) {
   if (err?.code === 'permission-denied') {
-    return `Couldn't ${what}. The big screen isn't taking answers from phones yet, so say it out loud for now.`
+    return `Couldn't ${what}. The game may have ended; check the big screen.`
   }
   return `Couldn't ${what}. Check your connection and try again.`
 }
