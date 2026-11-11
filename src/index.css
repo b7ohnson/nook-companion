@@ -2533,3 +2533,40 @@ ul.item-list { list-style: none; padding: 0; margin: 0; }
   75%  { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* ─────────────────────────────────────────
+   DATA-RELIABILITY FIXES (appended block)
+   Sync status, gallery upload results, calendar all-day strip and errors,
+   toast action button, notification prompt, sign-out confirm, error screen.
+───────────────────────────────────────── */
+.sync-busy { font-size: 0.65rem; color: #d97706; font-weight: 700; }
+
+.gallery-upload-result {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.gallery-upload-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+.gallery-upload-result-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+}
+.gallery-upload-result-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 96px;
+  overflow-y: auto;
+  word-break: break-word;
+}

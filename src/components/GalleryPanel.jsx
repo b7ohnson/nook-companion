@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGallery } from '../hooks/useGallery'
 import { IconUploadCloud, IconTrash2, IconImage } from './Icons'
 
 export default function GalleryPanel({ onClose }) {
-  const { photos, upload, remove, uploading, progress } = useGallery()
+  const { photos, upload, remove, uploading, progress, lastUpload, clearLastUpload } = useGallery()
   const [confirmDelete, setConfirmDelete] = useState(null)
   const fileRef = useRef(null)
+  const confirmTimerRef = useRef(null)
+
+  useEffect(() => () => clearTimeout(confirmTimerRef.current), [])
 
   const handleFiles = (e) => {
     if (e.target.files?.length) {
@@ -15,11 +18,13 @@ export default function GalleryPanel({ onClose }) {
   }
 
   const handleDelete = async (photo) => {
+    clearTimeout(confirmTimerRef.current)
     if (confirmDelete?.id === photo.id) {
-      await remove(photo)
       setConfirmDelete(null)
+      await remove(photo)
     } else {
       setConfirmDelete(photo)
+      confirmTimerRef.current = setTimeout(() => setConfirmDelete(null), 4000)
     }
   }
 
@@ -28,7 +33,7 @@ export default function GalleryPanel({ onClose }) {
       <div className="gallery-panel" onClick={e => e.stopPropagation()}>
         <div className="gallery-panel-header">
           <span className="gallery-panel-title">Photo Gallery</span>
-          <button className="gallery-panel-close" onClick={onClose}>✕</button>
+          <button className="gallery-panel-close" onClick={onClose} aria-label="Close gallery">✕</button>
         </div>
 
         <p className="gallery-panel-sub">
@@ -39,6 +44,22 @@ export default function GalleryPanel({ onClose }) {
           <div className="gallery-upload-progress">
             <div className="gallery-upload-bar" style={{ width: `${progress}%` }} />
             <span className="gallery-upload-pct">{progress}%</span>
+          </div>
+        )}
+
+        {lastUpload?.failed > 0 && !uploading && (
+          <div className="gallery-upload-result" role="alert">
+            <div className="gallery-upload-result-head">
+              <span>
+                {lastUpload.uploaded} of {lastUpload.total} uploaded, {lastUpload.failed} failed
+              </span>
+              <button className="gallery-upload-result-close" onClick={clearLastUpload} aria-label="Dismiss upload errors">✕</button>
+            </div>
+            <ul className="gallery-upload-result-list">
+              {lastUpload.failures.map((f, i) => (
+                <li key={i}>{f.name}: {f.reason}</li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -55,13 +76,16 @@ export default function GalleryPanel({ onClose }) {
                 <img
                   className="gallery-thumb"
                   src={photo.url}
-                  alt={photo.name}
+                  alt={photo.label || 'Gallery photo'}
                   loading="lazy"
                 />
-                {photo.name && <div className="gallery-thumb-name">{photo.name}</div>}
+                {photo.label && <div className="gallery-thumb-name">{photo.label}</div>}
                 <button
                   className={`gallery-thumb-del ${confirmDelete?.id === photo.id ? 'gallery-thumb-del--confirm' : ''}`}
                   onClick={() => handleDelete(photo)}
+                  aria-label={confirmDelete?.id === photo.id
+                    ? `Tap again to remove ${photo.label || 'this photo'}`
+                    : `Remove ${photo.label || 'photo'}`}
                   title={confirmDelete?.id === photo.id ? 'Tap again to confirm' : 'Remove photo'}
                 >
                   {confirmDelete?.id === photo.id ? '!' : <IconTrash2 size={13} />}
