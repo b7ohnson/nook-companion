@@ -19,7 +19,7 @@
   --text-3:    #646D78;   /* 5.1:1 */
   --accent:    #3D6E92;   /* slate, darkened to 5.3:1 for text and white-on-fill */
   --amber-ink: #8A5A00;   /* 5.9:1 */
-  --green:     #3F7A55;   /* 5.0:1 */
+  --green:     #38704D;   /* 5.6:1 */
   --red:       #B23E2C;   /* 5.9:1 */
   --red-tint:  #F7E3DE;
 
@@ -84,6 +84,10 @@ input  { font-family: var(--font); }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* The crash screen sits on the navy splash; its button text must not follow
+   --accent, which turns light slate in dark mode (white button). */
+.app-crash .app-crash-btn { color: var(--navy); }
 
 /* ── Login ──
    Flat night navy, the mark and the name, and the sign-in button down where
@@ -255,6 +259,8 @@ input  { font-family: var(--font); }
   color: var(--text-3);
 }
 .sync-note--offline { color: var(--red); font-weight: 600; }
+/* .sync-busy (appended block) is amber-on-white; give it the text-safe ink. */
+.tab-header .sync-busy { color: var(--amber-ink); }
 
 /* ── Person switch ──
    Two names with an underline in that person's colour, not two boxed tabs.
@@ -414,6 +420,7 @@ input  { font-family: var(--font); }
 }
 
 .home-section { display: flex; flex-direction: column; }
+.home-section + .home-section { margin-top: 14px; }
 
 .home-section-head { margin: 0; }
 

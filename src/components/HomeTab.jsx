@@ -1,58 +1,101 @@
 import { useTasks } from '../hooks/useTasks'
 import { useGroceries } from '../hooks/useGroceries'
+import { IconChevronRight } from './Icons'
 
-export default function HomeTab({ user, onNavigate }) {
+const PEOPLE = [
+  { id: 'blessing', label: 'Blessing', color: 'var(--p-blessing)' },
+  { id: 'pearl',    label: 'Pearl',    color: 'var(--p-pearl)'    },
+]
+
+const RECUR_SHORT = { daily: 'daily', weekly: 'weekly', monthly: 'monthly' }
+
+const CHORES_EACH = 3
+const GROCERIES_SHOWN = 6
+
+function plural(n, one, many) { return `${n} ${n === 1 ? one : many}` }
+
+// Opens on what someone actually wants to know: whose chores are still
+// open and what is left to buy. The section headings are the buttons.
+export default function HomeTab({ onNavigate }) {
   const { tasks, synced: tasksSynced } = useTasks()
   const { items, synced: grocSynced }  = useGroceries()
 
-  const loading = !tasksSynced || !grocSynced
+  const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
 
-  const blessingPending = (tasks.blessing || []).filter(t => !t.done).length
-  const pearlPending    = (tasks.pearl    || []).filter(t => !t.done).length
-  const groceryPending  = items.filter(i => !i.done).length
-  const groceryDone     = items.filter(i => i.done).length
-
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const people = PEOPLE.map(p => ({ ...p, open: (tasks[p.id] || []).filter(t => !t.done) }))
+  const choresLeft = people.reduce((n, p) => n + p.open.length, 0)
+  const toBuy = items.filter(i => !i.done)
 
   return (
     <div className="tab-content">
-      <div className="home-hero">
-        <p className="home-greeting">{greeting},</p>
-        <h2 className="home-name">{user?.displayName?.split(' ')[0] || 'there'}</h2>
-      </div>
+      <h2 className="home-date">{today}</h2>
 
-      <div className="home-cards">
-        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('tasks')}>
-          <div className="home-card-icon" style={{ background: '#EEF2FF' }}>📋</div>
-          <div className="home-card-body">
-            <div className="home-card-label">Blessing's Tasks</div>
-            <div className="home-card-value">{loading ? '—' : `${blessingPending} pending`}</div>
-          </div>
-        </div>
+      <section className="home-section" aria-labelledby="home-chores">
+        <h3 className="home-section-head" id="home-chores">
+          <button className="home-section-link" onClick={() => onNavigate('tasks')}>
+            <span className="home-section-title">Chores</span>
+            <span className="home-section-count">
+              {tasksSynced && (choresLeft ? `${choresLeft} left` : 'all done')}
+            </span>
+            <span className="home-section-go"><IconChevronRight size={18} /></span>
+          </button>
+        </h3>
 
-        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('tasks')}>
-          <div className="home-card-icon" style={{ background: '#FAF5FF' }}>📋</div>
-          <div className="home-card-body">
-            <div className="home-card-label">Pearl's Tasks</div>
-            <div className="home-card-value">{loading ? '—' : `${pearlPending} pending`}</div>
-          </div>
-        </div>
-
-        <div className="home-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate('groceries')}>
-          <div className="home-card-icon" style={{ background: '#F0FDF4' }}>🛒</div>
-          <div className="home-card-body">
-            <div className="home-card-label">Groceries</div>
-            <div className="home-card-value">
-              {loading ? '—' : `${groceryPending} to get${groceryDone > 0 ? `, ${groceryDone} done` : ''}`}
+        {!tasksSynced ? (
+          <p className="home-quiet">Loading…</p>
+        ) : choresLeft === 0 ? (
+          <p className="home-quiet">Every chore is done.</p>
+        ) : (
+          people.filter(p => p.open.length).map(p => (
+            <div key={p.id} style={{ '--person': p.color }}>
+              <p className="home-person">
+                {p.label}
+                <span className="home-person-left">{plural(p.open.length, 'chore', 'chores')}</span>
+              </p>
+              <ul className="home-list">
+                {p.open.slice(0, CHORES_EACH).map(t => (
+                  <li key={t.id} className="home-list-item">
+                    {t.task}
+                    {RECUR_SHORT[t.recurrence] && <span className="home-list-meta">{RECUR_SHORT[t.recurrence]}</span>}
+                  </li>
+                ))}
+              </ul>
+              {p.open.length > CHORES_EACH && (
+                <p className="home-more">and {p.open.length - CHORES_EACH} more</p>
+              )}
             </div>
-          </div>
-        </div>
-      </div>
+          ))
+        )}
+      </section>
 
-      <div className="home-tip">
-        Changes sync instantly to the NooK display.
-      </div>
+      <section className="home-section" aria-labelledby="home-groceries">
+        <h3 className="home-section-head" id="home-groceries">
+          <button className="home-section-link" onClick={() => onNavigate('groceries')}>
+            <span className="home-section-title">To buy</span>
+            <span className="home-section-count">
+              {grocSynced && (toBuy.length ? plural(toBuy.length, 'item', 'items') : '')}
+            </span>
+            <span className="home-section-go"><IconChevronRight size={18} /></span>
+          </button>
+        </h3>
+
+        {!grocSynced ? (
+          <p className="home-quiet">Loading…</p>
+        ) : toBuy.length === 0 ? (
+          <p className="home-quiet">The list is empty.</p>
+        ) : (
+          <>
+            <ul className="home-list home-list--groceries">
+              {toBuy.slice(0, GROCERIES_SHOWN).map(i => (
+                <li key={i.id} className="home-list-item">{i.name}</li>
+              ))}
+            </ul>
+            {toBuy.length > GROCERIES_SHOWN && (
+              <p className="home-more">and {toBuy.length - GROCERIES_SHOWN} more</p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   )
 }
