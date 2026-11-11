@@ -9,14 +9,17 @@
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
-    "firebase": "^12.16.0",
+    "firebase": "^13.2.0",
     "nook-core": "github:b7ohnson/nook-core#v1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.3.1",
-    "vite-plugin-pwa": "^0.20.0"
+    "@vitejs/plugin-react": "^6.3.0",
+    "vite": "^8.3.7",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-build": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-window": "^7.4.1"
   }
 }

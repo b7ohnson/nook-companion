@@ -27,12 +27,14 @@ export default defineConfig({
     }),
   ],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
-        }
-      }
-    }
-  }
+        codeSplitting: {
+          groups: [
+            { name: 'firebase', test: /node_modules[\\/](firebase|@firebase)[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
 })
