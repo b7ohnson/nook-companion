@@ -2642,3 +2642,18 @@ ul.item-list { list-style: none; padding: 0; margin: 0; }
   font-weight: 700;
   text-align: left;
 }
+
+.signout-who { font-size: 0.85rem; color: var(--text-2); margin: 0; }
+
+.app-crash { flex-direction: column; gap: 10px; padding: 24px; text-align: center; }
+.app-crash-title { font-size: 1.1rem; font-weight: 800; color: white; margin: 0; }
+.app-crash-sub { font-size: 0.85rem; color: rgba(255,255,255,0.85); margin: 0; }
+.app-crash-btn {
+  margin-top: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: white;
+  color: var(--accent);
+  font-weight: 700;
+}

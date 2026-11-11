@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { WEEK_START_DAY } from 'nook-core/constants'
 import { useMeals } from '../hooks/useMeals'
-import { IconAlertTriangle } from './Icons'
 
 const SLOTS = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -12,11 +12,11 @@ function getWeekDays(offset = 0) {
   const days  = []
   const today = new Date()
   const dow   = today.getDay()
-  const mon   = new Date(today)
-  mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + offset * 7)
+  const start = new Date(today)
+  start.setDate(today.getDate() - ((dow - WEEK_START_DAY + 7) % 7) + offset * 7)
   for (let i = 0; i < 7; i++) {
-    const d = new Date(mon)
-    d.setDate(mon.getDate() + i)
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
     const pad = n => String(n).padStart(2, '0')
     const str = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     days.push({
@@ -40,10 +40,9 @@ function weekLabel(offset, days) {
 
 export default function MenuManager() {
   const [weekOffset, setWeekOffset] = useState(0)
-  const { meals, synced, setMeal, deleteMeal } = useMeals()
+  const { meals, synced, status, setMeal, deleteMeal } = useMeals()
   const [editing, setEditing]   = useState(null) // { dateStr, slot, fullDayName }
   const [inputVal, setInputVal] = useState('')
-  const [saving, setSaving]     = useState(false)
 
   const days = getWeekDays(weekOffset)
 
@@ -53,21 +52,22 @@ export default function MenuManager() {
     setEditing({ dateStr, slot, fullDayName })
   }
 
-  const closeEdit = () => { setEditing(null); setSaving(false) }
+  const closeEdit = () => setEditing(null)
 
-  const handleSave = async () => {
-    if (!editing || saving) return
+  // Close straight away. The write shows up through the listener at once
+  // (and queues if offline); awaiting it here locked the sheet, Cancel
+  // included, for as long as a weak signal took. useMeals toasts on failure.
+  const handleSave = () => {
+    if (!editing) return
     const val = inputVal.trim()
     if (!val) return
-    setSaving(true)
-    await setMeal(editing.dateStr, editing.slot.key, val)
+    setMeal(editing.dateStr, editing.slot.key, val)
     closeEdit()
   }
 
-  const handleClear = async () => {
-    if (!editing || saving) return
-    setSaving(true)
-    await deleteMeal(editing.dateStr, editing.slot.key)
+  const handleClear = () => {
+    if (!editing) return
+    deleteMeal(editing.dateStr, editing.slot.key)
     closeEdit()
   }
 
@@ -80,8 +80,8 @@ export default function MenuManager() {
       {/* Header */}
       <div className="tab-header">
         <h2 className="tab-title">Menu</h2>
-        <span className={synced ? 'sync-ok' : 'sync-err'}>
-          {synced ? '● live' : '…'}
+        <span className={!synced || status === 'offline' ? 'sync-err' : status === 'saving' ? 'sync-busy' : 'sync-ok'}>
+          {!synced ? '…' : status === 'offline' ? '⚠ offline' : status === 'saving' ? '● saving' : '● live'}
         </span>
       </div>
 
@@ -175,7 +175,6 @@ export default function MenuManager() {
                 <button
                   className="sheet-btn sheet-btn--delete"
                   onClick={handleClear}
-                  disabled={saving}
                 >
                   Clear
                 </button>
@@ -183,16 +182,15 @@ export default function MenuManager() {
               <button
                 className="sheet-btn sheet-btn--cancel"
                 onClick={closeEdit}
-                disabled={saving}
               >
                 Cancel
               </button>
               <button
                 className="sheet-btn sheet-btn--save menu-save-btn"
                 onClick={handleSave}
-                disabled={!inputVal.trim() || saving}
+                disabled={!inputVal.trim()}
               >
-                {saving ? '…' : 'Save'}
+                Save
               </button>
             </div>
           </div>

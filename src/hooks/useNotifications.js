@@ -1,82 +1,87 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { TASKS } from 'nook-core/paths'
+import { TASKS, GROCERIES } from 'nook-core/paths'
 import { db } from '../firebase'
+import { notify, isLocal } from './useToasts'
+
+const supported = () => typeof window !== 'undefined' && 'Notification' in window
 
 async function pushNotification(title, body) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  if (!supported() || Notification.permission !== 'granted') return
+  const options = { body, icon: '/icon-192.png' }
   try {
     const reg = await navigator.serviceWorker.ready
-    await reg.showNotification(title, {
-      body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      vibrate: [200, 100, 200],
-    })
+    await reg.showNotification(title, { ...options, badge: '/icon-192.png', vibrate: [200, 100, 200] })
   } catch {
-    new Notification(title, { body, icon: '/icon-192.png' })
+    // No service worker (dev server, unsupported browser). The constructor
+    // itself throws on Android Chrome, so it needs its own guard.
+    try { new Notification(title, options) } catch { /* toast already shown */ }
   }
 }
 
+/**
+ * Watches the shared lists and announces items added from another device,
+ * as an in-app toast (via useToasts) and an OS notification when permitted.
+ *
+ * Permission is never requested on mount — browsers ignore or penalise a
+ * prompt with no user gesture. Render a button that calls `requestPermission`
+ * while `permission === 'default'`.
+ */
 export function useNotifications() {
-  const [toasts, setToasts] = useState([])
+  const [permission, setPermission] = useState(() => (supported() ? Notification.permission : 'unsupported'))
   const tasksInit  = useRef(false)
   const grocInit   = useRef(false)
   const knownTasks = useRef(new Set())
   const knownGroc  = useRef(new Set())
 
-  // Request OS notification permission once
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+  const requestPermission = useCallback(async () => {
+    if (!supported()) return 'unsupported'
+    let result
+    try {
+      result = await Notification.requestPermission()
+    } catch {
+      result = Notification.permission
     }
+    setPermission(result)
+    if (result === 'denied') notify('Notifications are blocked. Allow them for NooK in your browser settings.', 'info')
+    return result
   }, [])
-
-  const addToast = useCallback((message, type = 'info') => {
-    const id = `${Date.now()}-${Math.random()}`
-    setToasts(prev => [...prev.slice(-4), { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000)
-  }, [])
-
-  const dismiss = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
   useEffect(() => {
-    return onSnapshot(doc(db, ...TASKS), snap => {
+    return onSnapshot(doc(db, ...TASKS), { includeMetadataChanges: true }, snap => {
       const data = snap.exists() ? snap.data() : {}
       const all  = [
         ...(data.blessing || []).map(t => ({ ...t, who: 'Blessing' })),
         ...(data.pearl    || []).map(t => ({ ...t, who: 'Pearl'    })),
       ]
-      if (!tasksInit.current) {
-        all.forEach(t => knownTasks.current.add(t.id))
-        tasksInit.current = true
-        return
-      }
+      // Stay quiet until the first server snapshot: the persisted cache can
+      // be days old, and everything added since would be announced at once.
+      // A snapshot with pending writes contains this device's own unsent
+      // changes. In both cases remember the ids, announce nothing.
+      const quiet = !tasksInit.current || snap.metadata.hasPendingWrites
+      if (!snap.metadata.fromCache) tasksInit.current = true
       all.filter(t => !knownTasks.current.has(t.id)).forEach(t => {
-        const msg = `New task for ${t.who}: "${t.task}"`
-        addToast(msg, 'task')
-        pushNotification('NooK — New Task', 'You have a new task')
         knownTasks.current.add(t.id)
+        if (quiet || isLocal(t.id)) return
+        notify(`New task for ${t.who}: "${t.task}"`, 'task')
+        pushNotification('NooK — New Task', `${t.who}: ${t.task}`)
       })
-    })
-  }, [addToast])
+    }, err => console.error(err))
+  }, [])
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'skylight', 'groceries'), snap => {
+    return onSnapshot(doc(db, ...GROCERIES), { includeMetadataChanges: true }, snap => {
       const items = snap.exists() ? (snap.data().items || []) : []
-      if (!grocInit.current) {
-        items.forEach(i => knownGroc.current.add(i.id))
-        grocInit.current = true
-        return
-      }
+      const quiet = !grocInit.current || snap.metadata.hasPendingWrites
+      if (!snap.metadata.fromCache) grocInit.current = true
       items.filter(i => !knownGroc.current.has(i.id)).forEach(i => {
-        const msg = `Grocery added: "${i.name}"`
-        addToast(msg, 'grocery')
-        pushNotification('NooK — Groceries', 'Shopping list updated')
         knownGroc.current.add(i.id)
+        if (quiet) return
+        notify(`Grocery added: "${i.name}"`, 'grocery')
+        pushNotification('NooK — Groceries', `Added: ${i.name}`)
       })
-    })
-  }, [addToast])
+    }, err => console.error(err))
+  }, [])
 
-  return { toasts, dismiss }
+  return { permission, requestPermission }
 }
