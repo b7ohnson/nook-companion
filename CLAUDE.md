@@ -59,8 +59,9 @@ There is **no Express/Next.js API, no PostgreSQL, and no iCloud/CalDAV
 integration** anywhere in either repo. The entire backend surface is:
 
 - **Firestore** — data storage, read via `onSnapshot`/`getDocs`.
-- **Firebase Storage** — gallery photo files, under `gallery/**` (public
-  read, authenticated write — see `storage.rules` in this repo).
+- **Firebase Storage** — gallery photo files, under `gallery/**` (family
+  accounts only, images under 15 MB — see `storage.rules`; the apps show
+  photos through tokenised download URLs, which bypass the rules).
 - **Firebase Auth** — `GoogleAuthProvider` + `signInWithPopup`, single
   Google account per device/session (`useAuth.js`, nearly identical copy
   in both repos).
@@ -105,9 +106,19 @@ write access to game rooms. Each collection is listed explicitly instead, so
 **a new collection needs a new rule** or it is denied by default.
 
 Game rooms are readable by anyone (players join unauthenticated via QR) but
-writes are scoped: anonymous callers may only change `players`, and only
-before the room expires; creating, `state`/`payload` writes and deletes
-require auth. The 2h TTL and the 16-player cap are enforced in the rules and
+writes are scoped: anonymous callers may change `players` and the five
+buzz/answer keys of `payload` (`buzzedBy`, `buzzersOpen` — closing only —
+`submittedAnswer`, `fmSubmit`, `fmDuplicate`), and only before the room
+expires; creating, `state` and other `payload` writes, and deletes require
+a family account. A single room is publicly gettable; listing rooms is not.
+
+**Family accounts:** every other rule checks `isFamily()`, a fixed list of
+Firebase Auth uids in both `firestore.rules` and `storage.rules` (uids, not
+emails, because the repo is public). Any Google account can sign in, but
+only listed uids can read or write family data. Adding a person means
+adding their uid to both files and deploying.
+
+The 2h TTL and the 16-player cap are enforced in the rules and
 mirrored in `nook-core/constants` — rules can't import, so changing either
 means changing both.
 
